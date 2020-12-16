@@ -4,11 +4,11 @@
 
 
 ## Getting Data
-    '''
-    chmod u+x request_zip.sh
-    ./request_zip.sh
-    '''
+```
+chmod u+x request_zip.sh
+./request_zip.sh
+```
 
-    ``` 
-    python satellite_gather.py
-    ```
+``` 
+python satellite_gather.py
+```

@@ -48,12 +48,12 @@ class HennepinDataset(Dataset):
 
         #print(img_path)
         #image = Image.open(pthList[0])
-        image = rasterio.open(pthList[0])
-        array = image.read()
+        raster = rasterio.open(pthList[0])
+        array = raster.read()
 
 
         #Sample
-        sample = {'image': array, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array,'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 

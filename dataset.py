@@ -5,9 +5,9 @@ import glob
 import pandas as pd
 from torch.utils.data import Dataset
 from PIL import Image
+import rasterio
 
-# Make a dataloader for this dataset
-class CountyParcelDataset(Dataset):
+class HennepinDataset(Dataset):
     def __init__(self, csv_path, shapefile_path, root_dir, transform=None):
         """
         Args:
@@ -41,19 +41,18 @@ class CountyParcelDataset(Dataset):
 
         #Image Bounding Boxw
         image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
-
-
-
+        
         #Image
         img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-        pthList = glob.glob(img_path + '/*.jpg')
-        #print(img_path)
-        image = Image.open(pthList[0])
+        pthList = glob.glob(img_path + '/*.tiff')
 
-        image 
+        #print(img_path)
+        #image = Image.open(pthList[0])
+        array = rasterio.open(pthList[0])
+
 
         #Sample
-        sample = {'image': image, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 

@@ -34,10 +34,15 @@ class CountyParcelDataset(Dataset):
 
         #Polygons
         gdf = gp.read_file(self.shp_path, bbox = row_bbox)
-        geometry = gdf['geometry']
+        #geometry = gdf['geometry']
 
         #Value
         value = gdf['TOTAL_MV1']
+
+        #Image Bounding Boxw
+        image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
+
+
 
         #Image
         img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
@@ -45,8 +50,10 @@ class CountyParcelDataset(Dataset):
         #print(img_path)
         image = Image.open(pthList[0])
 
+        image 
+
         #Sample
-        sample = {'image': image, 'bbox': row_bbox, 'geometry': geometry, 'value': value}
+        sample = {'image': image, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 

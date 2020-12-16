@@ -77,7 +77,7 @@ if __name__ == "__main__":
                                       row['lat_max'], row['lon_max'])
                                       
       #print(image_url)
-      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.tiff".format(
+      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.jpg".format(
           int(row['lat_mid']), int(row['lon_mid']),
           row['lat_mid'], row['lon_mid'])
       jobs.append([image_url, out_file])

@@ -12,6 +12,20 @@ from multiprocessing import Pool
 import utils
 #from dataset import vec_XY, all_locations
 
+def download(item):
+  url = item[0]
+  fn = item[1]
+
+  if not os.path.exists(fn):
+    utils.ensure_dir(fn)
+    try:
+      urllib.request.urlretrieve(url, fn)
+    except:
+      print('error while retrieving {:}'.format(url))
+  else:
+    pass
+    #print('Skipped ', fn.split('/')[-1])
+
 
 if __name__ == "__main__":
 
@@ -45,7 +59,7 @@ if __name__ == "__main__":
 
   #print(df.head())
 
-  df.to_csv('/hennepin_bbox.csv')
+  df.to_csv('hennepin_bbox.csv')
 
   if __name__ == '__main__':
     #utils.ensure_dir(naip_dir)
@@ -63,7 +77,7 @@ if __name__ == "__main__":
                                       row['lat_max'], row['lon_max'])
                                       
       #print(image_url)
-      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.tif".format(
+      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.tiff".format(
           int(row['lat_mid']), int(row['lon_mid']),
           row['lat_mid'], row['lon_mid'])
       jobs.append([image_url, out_file])

@@ -48,7 +48,8 @@ class HennepinDataset(Dataset):
 
         #print(img_path)
         #image = Image.open(pthList[0])
-        array = rasterio.open(pthList[0])
+        image = rasterio.open(pthList[0])
+        array = image.read()
 
 
         #Sample

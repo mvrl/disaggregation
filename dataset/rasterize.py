@@ -5,7 +5,7 @@ from osgeo import ogr
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
 
 raster_path = '/output.tif'
-shapefile = 'dataset/hennepin_county_parcels/hennepin_county_parcels.shp'
+shapefile = 'hennepin_county_parcels/hennepin_county_parcels.shp'
 
 #making the shapefile as an object.
 input_shp = ogr.Open(shapefile)

@@ -12,6 +12,17 @@ from multiprocessing import Pool
 import utils
 #from dataset import vec_XY, all_locations
 
+
+'''
+Making a note here of the WMS server...
+
+Some useful links for debugging request:
+https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?request=GetCapabilities&service=WMS
+https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_Imagery_2019_6IN_WGS84WM/MapServer
+
+
+'''
+
 def download(item):
   url = item[0]
   fn = item[1]
@@ -65,7 +76,7 @@ if __name__ == "__main__":
     #utils.ensure_dir(naip_dir)
 
     #template_url = 'http://kyraster.ky.gov/arcgis/services/ImageServices/Ky_NAIP_2014_1M/ImageServer/WMSServer?request=GetMap&service=WMS&layers=0&CRS=EPSG:4326&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tif'
-    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tiff'
+    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/geotiff'
 
     print('Preparing jobs')
 

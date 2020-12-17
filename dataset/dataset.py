@@ -44,7 +44,7 @@ class HennepinDataset(Dataset):
         
         #Image
         img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-        pthList = glob.glob(img_path + '/*.jpg')
+        pthList = glob.glob(img_path + '/*.tif')
 
         #print(img_path)
         #image = Image.open(pthList[0])

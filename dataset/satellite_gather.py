@@ -65,7 +65,7 @@ if __name__ == "__main__":
     #utils.ensure_dir(naip_dir)
 
     #template_url = 'http://kyraster.ky.gov/arcgis/services/ImageServices/Ky_NAIP_2014_1M/ImageServer/WMSServer?request=GetMap&service=WMS&layers=0&CRS=EPSG:4326&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tif'
-    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/jpg'
+    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tiff'
 
     print('Preparing jobs')
 
@@ -76,8 +76,8 @@ if __name__ == "__main__":
       image_url = template_url.format(row['lat_min'], row['lon_min'],
                                       row['lat_max'], row['lon_max'])
                                       
-      #print(image_url)
-      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.jpg".format(
+      print(image_url)
+      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.tif".format(
           int(row['lat_mid']), int(row['lon_mid']),
           row['lat_mid'], row['lon_mid'])
       jobs.append([image_url, out_file])

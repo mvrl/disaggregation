@@ -6,6 +6,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 from PIL import Image
 import rasterio
+import numpy as np
 
 class HennepinDataset(Dataset):
     def __init__(self, csv_path, shapefile_path, root_dir, transform=None):
@@ -44,16 +45,24 @@ class HennepinDataset(Dataset):
         
         #Image
         img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-        pthList = glob.glob(img_path + '/*.tif')
+        pthList = sorted(glob.glob(img_path + '/*.tif'))
+
+        print(pthList)
 
         #print(img_path)
         #image = Image.open(pthList[0])
         raster = rasterio.open(pthList[0])
         array = raster.read()
 
-
+        try:
+            label_raster = rasterio.open(pthList[1])
+            label_array = label_raster.read()
+            label_array = np.flip(label_array, 1)
+        except IndexError:
+            label_array = 0
+        
         #Sample
-        sample = {'image': array,'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array,'label': label_array, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 

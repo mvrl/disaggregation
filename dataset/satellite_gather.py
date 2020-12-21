@@ -76,7 +76,7 @@ if __name__ == "__main__":
     #utils.ensure_dir(naip_dir)
 
     #template_url = 'http://kyraster.ky.gov/arcgis/services/ImageServices/Ky_NAIP_2014_1M/ImageServer/WMSServer?request=GetMap&service=WMS&layers=0&CRS=EPSG:4326&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tif'
-    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/geotiff'
+    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=3&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/geotiff'
 
     print('Preparing jobs')
 

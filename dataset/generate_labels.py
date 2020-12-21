@@ -11,7 +11,6 @@ bbox_df = pd.read_csv(csv_path)
 
 if __name__ == "__main__":
 
-
     # Loop through CSV
 
     for index,row in tqdm(bbox_df.iterrows()):

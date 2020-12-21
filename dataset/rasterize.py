@@ -5,7 +5,9 @@ from osgeo import ogr
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
 
 raster_path = '/output.tif'
-shapefile = 'hennepin_county_parcels/hennepin_county_parcels.shp'
+
+#this needs a full path
+shapefile = '/home/cohen/Desktop/GISGather/dataset/hennepin_county_parcels/hennepin_county_parcels.shp'
 
 #making the shapefile as an object.
 input_shp = ogr.Open(shapefile)
@@ -13,6 +15,7 @@ input_shp = ogr.Open(shapefile)
 #getting layer information of shapefile.
 shp_layer = input_shp.GetLayer()
 
+#print(shp_layer)
 
 def raster(bbox, fn):
     #pixel_size determines the size of the new raster.
@@ -45,7 +48,7 @@ def raster(bbox, fn):
     band.FlushCache()
 
     #main conversion method
-    gdal.RasterizeLayer(new_raster, [1], shp_layer, burn_values=[255])
+    gdal.RasterizeLayer(new_raster, [1], shp_layer, options=['ATTRIBUTE=TOTAL_MV1'])
 
     #adding a spatial reference
     new_rasterSRS = osr.SpatialReference()

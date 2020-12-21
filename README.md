@@ -15,7 +15,8 @@ Download Image set to ./datset/image_set/
 cd dataset
 python satellite_gather.py
 ```
-Create Labels
+Create Labels - Slow!
 ```
-TODO
+cd dataset
+python generate_labels.py
 ```

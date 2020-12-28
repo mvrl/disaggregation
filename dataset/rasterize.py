@@ -1,7 +1,9 @@
 import gdal
 from osgeo import osr
 from osgeo import ogr
+import geopandas as gpd
 
+# Code modifed from here
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
 
 raster_path = '/output.tif'
@@ -9,15 +11,28 @@ raster_path = '/output.tif'
 #this needs a full path
 shapefile = '/home/cohen/Desktop/GISGather/dataset/hennepin_county_parcels/hennepin_county_parcels.shp'
 
-#making the shapefile as an object.
-input_shp = ogr.Open(shapefile)
+'''s
+    Adding a new column to the shapefile and resaving
+'''
 
-#getting layer information of shapefile.
-shp_layer = input_shp.GetLayer()
+print("Writing new values to shapefile! Please Wait...")
 
-#print(shp_layer)
 
-def raster(bbox, fn):
+def raster(bbox,row_bbox, fn):
+
+    gdf = gpd.read_file(shapefile, bbox = row_bbox)
+    gdf.crs = "EPSG:26915"
+
+    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+    #print(gdf['AVERAGE_MV1'])
+    #gdf.to_file(shapefile)
+
+    #making the shapefile as an object.
+    input_shp = ogr.Open(gdf.to_json())
+
+    #getting layer information of shapefile.
+    shp_layer = input_shp.GetLayer()
+
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
     pixel_size = 2
@@ -34,7 +49,7 @@ def raster(bbox, fn):
     driver = gdal.GetDriverByName(image_type)
 
     #passing the filename, x and y direction resolution, no. of bands, new raster.
-    new_raster = driver.Create(fn, x_res, y_res, 1, gdal.GDT_Byte)
+    new_raster = driver.Create(fn, x_res, y_res, 1, gdal.GDT_Int32)
 
     #transforms between pixel raster space to projection coordinate space.
     new_raster.SetGeoTransform((x_min, pixel_size, 0, y_min, 0, pixel_size))
@@ -43,7 +58,7 @@ def raster(bbox, fn):
     band = new_raster.GetRasterBand(1)
 
     #assign no data value to empty cells.
-    no_data_value = -9999
+    no_data_value = 0
     band.SetNoDataValue(no_data_value)
     band.FlushCache()
 

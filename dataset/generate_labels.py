@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     # Loop through CSV
 
-
+    print("Rasterizing each label...")
     with tqdm(total = len(bbox_df)) as pbar:
         for index,row in bbox_df.iterrows():
 
@@ -22,11 +22,12 @@ if __name__ == "__main__":
             label_path = os.path.join(label_path, 'label.tif') # need a better label filename 
 
             image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
+            row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
 
             #print(label_path)
 
 
             # For each BBOX generate raster and filepath
-            rasterize.raster(bbox = image_bbox, fn= label_path)
+            rasterize.raster(bbox = image_bbox,row_bbox=row_bbox,fn= label_path)
 
             pbar.update(1)

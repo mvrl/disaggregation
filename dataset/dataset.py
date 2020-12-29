@@ -66,3 +66,47 @@ class HennepinDataset(Dataset):
 
         return sample
 
+class HennepinDatasetLight(Dataset):
+    def __init__(self, csv_path, root_dir, transform=None):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.bbox_frame = pd.read_csv(csv_path)
+        self.root_dir = root_dir
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.bbox_frame)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        #Bounding Box 
+        row = self.bbox_frame.iloc[idx]
+        row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
+
+        #Path
+        img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+        pthList = sorted(glob.glob(img_path + '/*.tif'))
+
+        #Image
+        raster = rasterio.open(pthList[0])
+        array = raster.read()
+
+        #Label
+        try:
+            label_raster = rasterio.open(pthList[1])
+            label_array = label_raster.read()
+            label_array = np.flip(label_array, 1)
+        except IndexError:
+            label_array = 0
+
+        #Sample
+        sample = {'image': array,'label': label_array, 'bbox': row_bbox}
+
+        return sample

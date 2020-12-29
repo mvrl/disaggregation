@@ -40,7 +40,7 @@ def download(item):
 
 if __name__ == "__main__":
 
-  #image size
+  #image size in meters
   image_width = 302 * 2
   delta_X = image_width / 2
 

@@ -10,17 +10,12 @@ import urllib.request
 from multiprocessing import Pool
 
 import utils
-#from dataset import vec_XY, all_locations
-
-
 '''
 Making a note here of the WMS server...
 
 Some useful links for debugging request:
 https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?request=GetCapabilities&service=WMS
 https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_Imagery_2019_6IN_WGS84WM/MapServer
-
-
 '''
 
 def download(item):

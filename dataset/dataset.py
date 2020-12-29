@@ -8,7 +8,8 @@ from PIL import Image
 import rasterio
 import numpy as np
 
-class HennepinDataset(Dataset):
+# This dataset class is for full inspection of the dataset, used for debugging
+class HennepinDatasetFull(Dataset):
     def __init__(self, csv_path, shapefile_path, root_dir, transform=None):
         """
         Args:
@@ -54,19 +55,28 @@ class HennepinDataset(Dataset):
         raster = rasterio.open(pthList[0])
         array = raster.read()
 
+        # Parcel Label
+        try:
+            label_raster = rasterio.open(pthList[2])
+            parcel_label = label_raster.read()
+            parcel_label = np.flip(parcel_label, 1)
+        except IndexError:
+            parcel_label = 0
+
+        # Building Label
         try:
             label_raster = rasterio.open(pthList[1])
-            label_array = label_raster.read()
-            label_array = np.flip(label_array, 1)
+            building_label = label_raster.read()
+            building_label = np.flip(building_label, 1)
         except IndexError:
-            label_array = 0
+            building_label = 0
         
         #Sample
-        sample = {'image': array,'label': label_array, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array,'parcel_label': parcel_label,'building_label': building_label, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 
-class HennepinDatasetLight(Dataset):
+class HennepinDataset(Dataset):
     def __init__(self, csv_path, root_dir, transform=None):
         """
         Args:
@@ -98,15 +108,23 @@ class HennepinDatasetLight(Dataset):
         raster = rasterio.open(pthList[0])
         array = raster.read()
 
-        #Label
+        # Parcel Label
+        try:
+            label_raster = rasterio.open(pthList[2])
+            parcel_label = label_raster.read()
+            parcel_label = np.flip(parcel_label, 1)
+        except IndexError:
+            parcel_label = 0
+
+        # Building Label
         try:
             label_raster = rasterio.open(pthList[1])
-            label_array = label_raster.read()
-            label_array = np.flip(label_array, 1)
+            building_label = label_raster.read()
+            building_label = np.flip(building_label, 1)
         except IndexError:
-            label_array = 0
+            building_label = 0
 
         #Sample
-        sample = {'image': array,'label': label_array, 'bbox': row_bbox}
+        sample = {'image': array,'parcel_label': parcel_label,'building_label':building_label,'bbox': row_bbox}
 
         return sample

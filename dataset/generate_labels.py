@@ -9,7 +9,7 @@ import geopandas as gpd
 # Code modifed from here
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
 
-#this needs a full path
+# Local paths
 parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
@@ -18,15 +18,15 @@ csv_path = './hennepin_bbox.csv'
 
 root_dir = './image_set'
 
-
+# Rasterizing parcel values
 def raster_parcels(bbox, row_bbox, fn):
 
+    # Filter shapefile
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
     gdf.crs = "EPSG:26915"
 
+    # Add Average Value
     gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
-    #print(gdf['AVERAGE_MV1'])
-    #gdf.to_file(shapefile)
 
     #making the shapefile as an object.
     input_shp = ogr.Open(gdf.to_json())
@@ -71,16 +71,15 @@ def raster_parcels(bbox, row_bbox, fn):
     new_rasterSRS.ImportFromEPSG(2975)
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
+# Rasterizing building masks 
 def raster_buildings(bbox, row_bbox, fn):
 
     gdf = gpd.read_file(buildings_file, bbox = row_bbox)
 
     gdf.crs = "EPSG:26915"
-    #gdf.to_crs(epsg=26915)
 
     #making the shapefile as an object.
     input_shp = ogr.Open(gdf.to_json())
-    #input_shp = ogr.Open(buildings_file)
 
     #getting layer information of shapefile.
     shp_layer = input_shp.GetLayer()
@@ -122,10 +121,11 @@ def raster_buildings(bbox, row_bbox, fn):
     new_rasterSRS.ImportFromEPSG(2975)
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
+# Loop through generated CSV
 if __name__ == "__main__":
+
     bbox_df = pd.read_csv(csv_path)
 
-    # Loop through CSV
 
     print("Rasterizing each label...")
     with tqdm(total = len(bbox_df)) as pbar:
@@ -136,11 +136,9 @@ if __name__ == "__main__":
             parcel_path = os.path.join(label_path, 'parcel_value.tif')# need a better label filename 
             building_path = os.path.join(label_path, 'building_mask.tif')
 
-
+            #BBOXES with different orientations
             image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
             row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
-
-            #print(label_path)
 
             # For each BBOX generate raster and filepath
             raster_parcels(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_path)

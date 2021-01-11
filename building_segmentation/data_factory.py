@@ -33,6 +33,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         building_name = self.full_list[idx]
         building_fname = os.path.join(self.data_dir, building_name)
         building_mask =  Image.open(building_fname)
+        building_mask = transforms_function.vflip(building_mask) # original labels are vertically flipped
 
         # image
         name_split = building_name.split('/')

@@ -55,11 +55,13 @@ def save_batch_images(source, predicted, labels, out_dir, ctr):
         plt.subplot(3,1,2)
         plt.imshow(predicted[k, :, :].detach().cpu().numpy())
         #plt.colorbar()
+        plt.title('prediction')
         plt.axis('off')
 
         plt.subplot(3,1,3)
         plt.imshow(labels[k, :, :].detach().cpu().numpy())
         plt.axis('off')
+        plt.title('GT')
         #plt.colorbar()
         fname1 = str(str(ctr) +'_' +str(k) + '_combined' + '.png')
         plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')

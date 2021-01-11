@@ -30,6 +30,6 @@ cfg.train.num_epochs = 50                # number of training epochs  ...
 cfg.train.num_workers = 8                # workers for data loading
 cfg.train.device_ids = [0, 1]            # Train on two GPUs? Set True for blackbird
 
-cfg.train.loss_weight = [0.1, 2.0]           # loss weights used during training
+cfg.train.loss_weight = [0.2, 2.0]           # loss weights used during training
 
-cfg.train.out_dir = './outputs/2'        # [2] train w/ loss weights
+cfg.train.out_dir = './outputs/3'        # [3] fix labels, train w/ loss weights

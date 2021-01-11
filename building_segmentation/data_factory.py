@@ -34,7 +34,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         building_fname = os.path.join(self.data_dir, building_name)
         building_mask =  Image.open(building_fname)
 
-
         # image
         name_split = building_name.split('/')
         subdir_name = '/'.join(name_split[:-1])

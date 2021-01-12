@@ -15,7 +15,7 @@ cfg.model.out_channels = 2
 cfg.data = edict()
 cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
-cfg.data.cutout_size = (256, 256)        # final image size. Not implemented yet
+cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
 cfg.data.root_dir = '../dataset/image_set'
 
 cfg.train = edict()
@@ -33,3 +33,6 @@ cfg.train.device_ids = [0, 1]            # Train on two GPUs? Set True for black
 cfg.train.loss_weight = [0.2, 2.0]           # loss weights used during training
 
 cfg.train.out_dir = './outputs/3'        # [3] fix labels, train w/ loss weights
+
+# evaluation settings
+cfg.data.eval_mode = 'val'              # evaluation split. options: 'val', 'test'

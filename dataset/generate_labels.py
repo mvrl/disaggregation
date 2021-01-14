@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from tqdm import tqdm
-import gdal
+from osgeo import gdal
 from osgeo import osr
 from osgeo import ogr
 import geopandas as gpd
@@ -14,9 +14,9 @@ parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
 
-csv_path = './hennepin_bbox.csv'
+csv_path = '/u/eag-d1/data/Hennepin/hennepin_bbox_ver1.csv'
 
-root_dir = './image_set'
+root_dir = '/u/eag-d1/data/Hennepin/ver1'
 
 # Rasterizing parcel values
 def raster_parcels(bbox, row_bbox, fn):

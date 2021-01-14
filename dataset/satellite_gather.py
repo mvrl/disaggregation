@@ -10,6 +10,7 @@ import urllib.request
 from multiprocessing import Pool
 
 import utils
+import argparse
 '''
 Making a note here of the WMS server...
 
@@ -17,6 +18,11 @@ Some useful links for debugging request:
 https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?request=GetCapabilities&service=WMS
 https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_Imagery_2019_6IN_WGS84WM/MapServer
 '''
+parser = argparse.ArgumentParser(description='Download Image Set to folder')
+parser.add_argument('--path', type=str, help='Directory to download to.', default= './downloads/')
+parser.add_argument('--gsd', type=int, help='Ground Sample Distance', default=1)
+args = parser.parse_args()
+
 
 def download(item):
   url = item[0]
@@ -36,7 +42,7 @@ def download(item):
 if __name__ == "__main__":
 
   #image size in meters
-  image_width = 302 * 2
+  image_width = 302 * int(args.gsd)
   delta_X = image_width / 2
 
   #ESPG:26915 - meters
@@ -65,8 +71,6 @@ if __name__ == "__main__":
 
   #print(df.head())
 
-  df.to_csv('hennepin_bbox.csv')
-
   if __name__ == '__main__':
     #utils.ensure_dir(naip_dir)
 
@@ -83,7 +87,7 @@ if __name__ == "__main__":
                                       row['lat_max'], row['lon_max'])
                                       
       print(image_url)
-      out_file = 'image_set/' + "{:}/{:}/{:}_{:}.tif".format(
+      out_file = args.path + "{:}/{:}/{:}_{:}.tif".format(
           int(row['lat_mid']), int(row['lon_mid']),
           row['lat_mid'], row['lon_mid'])
       jobs.append([image_url, out_file])
@@ -94,5 +98,11 @@ if __name__ == "__main__":
 
   for fn in tqdm(p.imap_unordered(download, jobs), total=len(jobs)):
     pass
+
+
+  csv_outfile = args.path + 'hennepin_bbox_ver1.csv'
+
+  df.to_csv(csv_outfile)
+
 
   end = time.time()

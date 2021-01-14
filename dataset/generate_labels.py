@@ -9,17 +9,18 @@ import geopandas as gpd
 # Code modifed from here
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
 
+parser = argparse.ArgumentParser(description='Download Image Set to folder')
+parser.add_argument('--dir', type=str, help='Directory to download to.', default= './downloads/')
+parser.add_argument('--gsd', type=int, help='Ground Sample Distance', default=1)
+args = parser.parse_args()
+
 # Local paths
 parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
 
-csv_path = '/u/eag-d1/data/Hennepin/hennepin_bbox_ver1.csv'
-
-root_dir = '/u/eag-d1/data/Hennepin/ver1'
-
 # Rasterizing parcel values
-def raster_parcels(bbox, row_bbox, fn):
+def raster_parcels_values(bbox, row_bbox, fn):
 
     # Filter shapefile
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
@@ -36,7 +37,7 @@ def raster_parcels(bbox, row_bbox, fn):
 
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
-    pixel_size = 2
+    pixel_size = int(args.gsd)
 
     #get extent values to set size of output raster.
     x_min, x_max, y_min, y_max = bbox
@@ -86,7 +87,7 @@ def raster_buildings(bbox, row_bbox, fn):
 
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
-    pixel_size = 2
+    pixel_size = int(args.gsd)
 
     #get extent values to set size of output raster.
     x_min, x_max, y_min, y_max = bbox
@@ -124,6 +125,8 @@ def raster_buildings(bbox, row_bbox, fn):
 # Loop through generated CSV
 if __name__ == "__main__":
 
+    csv_path = args.dir + 'hennepin_bbox.csv'
+
     bbox_df = pd.read_csv(csv_path)
 
 
@@ -131,7 +134,7 @@ if __name__ == "__main__":
     with tqdm(total = len(bbox_df)) as pbar:
         for index,row in bbox_df.iterrows():
 
-            label_path = os.path.join(root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+            label_path = os.path.join(args.dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
             parcel_path = os.path.join(label_path, 'parcel_value.tif')# need a better label filename 
             building_path = os.path.join(label_path, 'building_mask.tif')
@@ -141,7 +144,7 @@ if __name__ == "__main__":
             row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
 
             # For each BBOX generate raster and filepath
-            raster_parcels(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_path)
+            raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_path)
 
             raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
 

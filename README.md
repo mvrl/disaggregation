@@ -10,13 +10,14 @@ cd dataset
 chmod u+x request_zip.sh
 ./request_zip.sh
 ```
-Download Image set to ./datset/image_set/
+Download Images
 ```
 cd dataset
-python satellite_gather.py
+python satellite_gather.py --path /u/eag-d1/data/Hennepin/ver1/ --gsd 1
 ```
 Create Labels - Slow!
 ```
 cd dataset
-python generate_labels.py
+python generate_labels.py --path /u/eag-d1/data/Hennepin/ver1/ --gsd 1
 ```
+## Building Segmentation

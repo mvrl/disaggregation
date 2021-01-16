@@ -57,7 +57,7 @@ class HennepinDatasetFull(Dataset):
 
         # Parcel Value Label
         try:
-            label_raster = rasterio.open(pthList[3])
+            label_raster = rasterio.open(pthList[4])
             pvalue_label = label_raster.read()
             pvalue_label = np.flip(pvalue_label, 1)
         except IndexError:
@@ -65,11 +65,19 @@ class HennepinDatasetFull(Dataset):
 
         # Parcel Mask Label
         try:
-            label_raster = rasterio.open(pthList[2])
+            label_raster = rasterio.open(pthList[3])
             pmask_label = label_raster.read()
             pmask_label = np.flip(pmask_label, 1)
         except IndexError:
             pmask_label = 0
+
+        # Parcel Boundary Label
+        try:
+            label_raster = rasterio.open(pthList[2])
+            pboundary_label = label_raster.read()
+            pboundary_label = np.flip(pboundary_label, 1)
+        except IndexError:
+            pboundary_label = 0
 
         # Building Label
         try:
@@ -80,7 +88,7 @@ class HennepinDatasetFull(Dataset):
             building_label = 0
         
         #Sample
-        sample = {'image': array,'pvalue_label': pvalue_label,'pmask_label': pmask_label,'building_label': building_label, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array,'pvalue_label': pvalue_label,'pboundary_label':pboundary_label,'pmask_label': pmask_label,'building_label': building_label, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 

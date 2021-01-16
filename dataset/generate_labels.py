@@ -252,12 +252,13 @@ if __name__ == "__main__":
             row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
 
             # For each BBOX generate raster and filepath
-            raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_value_path)
-
-            raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
-
-            raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
-
-            raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
+            if not os.path.exists(parcel_value_path):
+                raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_value_path)
+            if not os.path.exists(parcel_mask_path):
+                raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
+            if not os.path.exists(building_path):
+                raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
+            if not os.path.exists(boundary_path):
+                raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
 
             pbar.update(1)

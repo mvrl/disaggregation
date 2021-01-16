@@ -176,6 +176,58 @@ def raster_buildings(bbox, row_bbox, fn):
     new_rasterSRS.ImportFromEPSG(2975)
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
+# Rasterizing building masks 
+def raster_boundary(bbox, row_bbox, fn):
+
+    gdf = gpd.read_file(parcels_file, bbox = row_bbox)
+
+    gdf.crs = "EPSG:26915"
+
+    gdf = gdf.boundary
+
+    #making the shapefile as an object.
+    input_shp = ogr.Open(gdf.to_json())
+
+    #getting layer information of shapefile.
+    shp_layer = input_shp.GetLayer()
+
+    #pixel_size determines the size of the new raster.
+    #pixel_size is proportional to size of shapefile.
+    pixel_size = int(args.gsd)
+
+    #get extent values to set size of output raster.
+    x_min, x_max, y_min, y_max = bbox
+
+    #calculate size/resolution of the raster.
+    x_res = int((x_max - x_min) / pixel_size)
+    y_res = int((y_max - y_min) / pixel_size)
+
+    #get GeoTiff driver by 
+    image_type = 'GTiff'
+    driver = gdal.GetDriverByName(image_type)
+
+    #passing the filename, x and y direction resolution, no. of bands, new raster.
+    new_raster = driver.Create(fn, x_res, y_res, 1, gdal.GDT_Byte)
+
+    #transforms between pixel raster space to projection coordinate space.
+    new_raster.SetGeoTransform((x_min, pixel_size, 0, y_min, 0, pixel_size))
+
+    #get required raster band.
+    band = new_raster.GetRasterBand(1)
+
+    #assign no data value to empty cells.
+    no_data_value = -9999
+    band.SetNoDataValue(no_data_value)
+    band.FlushCache()
+
+    #main conversion method
+    gdal.RasterizeLayer(new_raster, [1], shp_layer, burn_values=[1])
+
+    #adding a spatial reference
+    new_rasterSRS = osr.SpatialReference()
+    new_rasterSRS.ImportFromEPSG(2975)
+    new_raster.SetProjection(new_rasterSRS.ExportToWkt())
+
 # Loop through generated CSV
 if __name__ == "__main__":
 
@@ -193,6 +245,7 @@ if __name__ == "__main__":
             parcel_value_path = os.path.join(label_path, 'parcel_value.tif')# need a better label filename 
             building_path = os.path.join(label_path, 'building_mask.tif')
             parcel_mask_path = os.path.join(label_path, 'parcel_mask.tif')
+            boundary_path = os.path.join(label_path, 'parcel_boundary.tif')
 
             #BBOXES with different orientations
             image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
@@ -204,5 +257,7 @@ if __name__ == "__main__":
             raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
 
             raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
+
+            raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
 
             pbar.update(1)

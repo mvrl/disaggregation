@@ -55,13 +55,21 @@ class HennepinDatasetFull(Dataset):
         raster = rasterio.open(pthList[0])
         array = raster.read()
 
-        # Parcel Label
+        # Parcel Value Label
+        try:
+            label_raster = rasterio.open(pthList[3])
+            pvalue_label = label_raster.read()
+            pvalue_label = np.flip(pvalue_label, 1)
+        except IndexError:
+            pvalue_label = 0
+
+        # Parcel Mask Label
         try:
             label_raster = rasterio.open(pthList[2])
-            parcel_label = label_raster.read()
-            parcel_label = np.flip(parcel_label, 1)
+            pmask_label = label_raster.read()
+            pmask_label = np.flip(pmask_label, 1)
         except IndexError:
-            parcel_label = 0
+            pmask_label = 0
 
         # Building Label
         try:
@@ -72,7 +80,7 @@ class HennepinDatasetFull(Dataset):
             building_label = 0
         
         #Sample
-        sample = {'image': array,'parcel_label': parcel_label,'building_label': building_label, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
+        sample = {'image': array,'pvalue_label': pvalue_label,'pmask_label': pmask_label,'building_label': building_label, 'raster': raster, 'bbox': row_bbox, 'img_bbox': image_bbox, 'geometry': gdf, 'value': value}
 
         return sample
 
@@ -108,13 +116,21 @@ class HennepinDataset(Dataset):
         raster = rasterio.open(pthList[0])
         array = raster.read()
 
-        # Parcel Label
+        # Parcel Value Label
+        try:
+            label_raster = rasterio.open(pthList[3])
+            pvalue_label = label_raster.read()
+            pvalue_label = np.flip(pvalue_label, 1)
+        except IndexError:
+            pvalue_label = 0
+
+        # Parcel Mask Label
         try:
             label_raster = rasterio.open(pthList[2])
-            parcel_label = label_raster.read()
-            parcel_label = np.flip(parcel_label, 1)
+            pmask_label = label_raster.read()
+            pmask_label = np.flip(pmask_label, 1)
         except IndexError:
-            parcel_label = 0
+            pmask_label = 0
 
         # Building Label
         try:
@@ -125,6 +141,6 @@ class HennepinDataset(Dataset):
             building_label = 0
 
         #Sample
-        sample = {'image': array,'parcel_label': parcel_label,'building_label':building_label,'bbox': row_bbox}
+        sample = {'image': array,'pvalue_label': pvalue_label, 'pmask_label': pmask_label,'building_label':building_label,'bbox': row_bbox}
 
         return sample

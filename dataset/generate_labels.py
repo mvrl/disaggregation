@@ -164,7 +164,7 @@ def raster_buildings(bbox, row_bbox, fn):
     band = new_raster.GetRasterBand(1)
 
     #assign no data value to empty cells.
-    no_data_value = -9999
+    no_data_value = 0
     band.SetNoDataValue(no_data_value)
     band.FlushCache()
 
@@ -216,7 +216,7 @@ def raster_boundary(bbox, row_bbox, fn):
     band = new_raster.GetRasterBand(1)
 
     #assign no data value to empty cells.
-    no_data_value = -9999
+    no_data_value = 0
     band.SetNoDataValue(no_data_value)
     band.FlushCache()
 

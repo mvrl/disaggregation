@@ -17,7 +17,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.mode = mode
         self.data_dir = data_dir
 
-        self.csv = pd.read_csv(csv_path)
+        self.df = pd.read_csv(csv_path)
         
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
@@ -29,11 +29,11 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         
         
     def __len__(self):
-        return len(self.full_list)
+        return len(self.df)
     
     def __getitem__(self, idx):
-        # Grab path from CSV
-        row = self.csv.iloc[idx]
+        # Grab path from CSV dataframe
+        row = self.df.iloc[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
         # read building mask
@@ -96,8 +96,24 @@ def get_data(cfg, mode, data_dir=cfg.data.root_dir):
     # valid options: 'train', 'val', 'test'
     
     this_dataset = dataset_hennepin(mode=mode, data_dir=data_dir, csv_path = cfg.data.csv_path)
-        
-    data_loader = DataLoader(this_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
+
+    torch.manual_seed(0)
+
+    #Split Sizes
+    train_size = int( np.floor( len(this_dataset) * (1-cfg.train.validation_split-cfg.train.test_split) ) )
+    val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split) )
+    test_size = int( np.floor( len(this_dataset) * cfg.train.test_split ) )
+
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
+
+    if(mode == 'train'):
+        data_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
+                             num_workers=cfg.train.num_workers)
+    elif(mode == 'val'):
+        data_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
+                             num_workers=cfg.train.num_workers)
+    elif(mode == 'test'):
+        data_loader = DataLoader(test_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
                              num_workers=cfg.train.num_workers)
     
     return data_loader

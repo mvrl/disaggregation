@@ -94,6 +94,7 @@ class Unet(nn.Module):
         self.up3 = up(int(256/feature_reduction), int(64/feature_reduction), norm_type)
         self.up4 = up(int(128/feature_reduction), int(64/feature_reduction), norm_type)
         self.outc = outconv(int(64/feature_reduction), out_channels)
+        self.outREG = outconv(int(64/feature_reduction), 1)
         
 
     def forward(self, image): #
@@ -106,5 +107,7 @@ class Unet(nn.Module):
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         x = self.up4(x, x1)
+        y = self.outREG(x)
         x = self.outc(x)
-        return x
+        
+        return x, y

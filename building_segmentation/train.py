@@ -28,11 +28,13 @@ scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=cfg.train.lr_decay_
 # loss function
 weight_list = cfg.train.loss_weight
 if len(weight_list)==0:
-    criterion = nn.CrossEntropyLoss(ignore_index=-1) 
+    seg_criterion = nn.CrossEntropyLoss(ignore_index=-1) 
 else:
     weight = torch.tensor(weight_list).cuda()
     print('class weights for loss:', weight)
-    criterion = nn.CrossEntropyLoss(weight, ignore_index=-1) 
+    seg_criterion = nn.CrossEntropyLoss(weight, ignore_index=-1)
+
+reg_criterion = nn.SmoothL1Loss()
 
 # logging
 train_loss = []
@@ -48,6 +50,7 @@ else:
 print('configurations: ', cfg)
 print('starting training')
 
+
 ## Train
 for epoch in range(cfg.train.num_epochs):
     # training
@@ -56,17 +59,36 @@ for epoch in range(cfg.train.num_epochs):
     for i, data in enumerate(train_loader):
         optim.zero_grad()  # clear gradients        
         image = data[0].cuda()
-        labels = data[1].long().cuda()
+        seg_labels = data[1].long().cuda()
+        reg_labels = data[2].float().cuda()
         
-        predictions = model(image)
+        seg_predictions, reg_predictions = model(image)
         
-        loss = criterion(predictions, labels).unsqueeze(0)
+        seg_loss = seg_criterion(seg_predictions, seg_labels).unsqueeze(0)
         
-        loss.backward()
+        #seg_loss.backward()
     
+        #optim.step()
+
+        #optim.zero_grad()hi 
+
+        #print( list(reg_labels.size() ) )
+        #print( list(seg_labels.size() ) )
+        #print( list(reg_predictions.size() ) )
+        #print( list(seg_predictions.size() ) )
+
+        reg_predictions = torch.squeeze(reg_predictions)
+
+        reg_loss = reg_criterion( reg_predictions , reg_labels)
+        #reg_loss.backward()
+
+        loss = reg_loss + seg_loss
+
+        loss.backward()
+
         optim.step()
         
-        loss_train += loss.detach().cpu().item()
+        loss_train += seg_loss.detach().cpu().item() #+ reg_loss.detach().cpu().item()
         
         # printing
         if (i+1)%20 == 0:
@@ -82,10 +104,16 @@ for epoch in range(cfg.train.num_epochs):
         for i, data in enumerate(val_loader):
             optim.zero_grad()  # clear gradients
             image = data[0].cuda()
-            labels = data[1].long().cuda()
-            
-            predictions = model(image)
-            loss = criterion(predictions, labels).unsqueeze(0)
+            seg_labels = data[1].long().cuda()
+            reg_labels = data[2].float().cuda()
+        
+            seg_predictions, reg_predictions = model(image)
+            seg_loss = seg_criterion(seg_predictions, seg_labels).unsqueeze(0)
+
+            reg_predictions = torch.squeeze(reg_predictions)
+            reg_loss = reg_criterion( reg_predictions , reg_labels)
+
+            loss = reg_loss + seg_loss
 
             loss_val += loss.detach().cpu().item()
                 

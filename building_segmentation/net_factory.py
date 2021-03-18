@@ -14,6 +14,10 @@ def get_network(net_name, in_channels=3):
     if net_name == 'unet':
         from models.unet import Unet
         net = Unet(in_channels=3, out_channels=cfg.model.out_channels)
+    if net_name == 'nested_unet':
+        from models.unet import NestedUNet
+        net = NestedUNet(in_channels=3, out_channels=cfg.model.out_channels)
+    
     else:
         raise valueError('no model with name:',net_name)
     

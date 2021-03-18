@@ -11,15 +11,18 @@ from config import cfg
 from net_factory import get_network
 from data_factory import get_data
 
-def save_batch_images(source, predicted, labels, out_dir, ctr):
+def save_batch_images(source, seg_predictions, seg_labels,reg_predictions,reg_labels,out_dir,ctr):
     # normalize the prediction
-    predicted = F.softmax(predicted, dim=1)     # for training, PyTorch expects the prediction to be unnormalized
+    seg_predictions = F.softmax(seg_predictions, dim=1)
+    reg_predictions = F.softmax(reg_predictions, dim=1)       # for training, PyTorch expects the prediction to be unnormalized
     
-    n_classes = predicted.shape[1]
+    n_classes = seg_predictions.shape[1]
 
-    predicted = torch.argmax(predicted, dim=1)
+    seg_predictions = torch.argmax(seg_predictions, dim=1)
 
-    batch_n = predicted.shape[0]
+    reg_predictions = torch.argmax(reg_predictions, dim=1)
+
+    batch_n = seg_predictions.shape[0]
 
     plt.ioff()
     for k in range(batch_n):
@@ -33,35 +36,61 @@ def save_batch_images(source, predicted, labels, out_dir, ctr):
 
         plt.figure()
 
-        plt.imshow(predicted[k, :, :].detach().cpu().numpy())
+        plt.imshow(seg_predictions[k, :, :].detach().cpu().numpy())
         plt.axis('off')
-        fname1 = str(str(ctr) +'_' +str(k) + '_pred' + '.png')
+        fname1 = str(str(ctr) +'_' +str(k) + '_SEGpred' + '.png')
         plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')
         plt.close()
 
         plt.figure()
-        plt.imshow(labels[k, :, :].detach().cpu().numpy())
+        plt.imshow(seg_labels[k, :, :].detach().cpu().numpy())
         plt.axis('off')
-        fname1 = str(str(ctr) +'_' +str(k) + '_target' + '.png')
+        fname1 = str(str(ctr) +'_' +str(k) + '_SEGtarget' + '.png')
+        plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')
+        plt.close()
+
+        plt.figure()
+        plt.imshow(reg_predictions[k, :, :].detach().cpu().numpy())
+        plt.axis('off')
+        fname1 = str(str(ctr) +'_' +str(k) + '_REGpred' + '.png')
+        plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')
+        plt.close()
+
+        plt.figure()
+        plt.imshow(reg_labels[k, :, :].detach().cpu().numpy())
+        plt.axis('off')
+        fname1 = str(str(ctr) +'_' +str(k) + '_REGtarget' + '.png')
         plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')
         plt.close()
         
         
         plt.figure(dpi=300)
-        plt.subplot(3,1,1)
+        plt.subplot(3,2,1)
         plt.imshow(img_now.detach().cpu().numpy())
         plt.axis('off')
 
-        plt.subplot(3,1,2)
-        plt.imshow(predicted[k, :, :].detach().cpu().numpy())
+        plt.subplot(3,2,2)
+        plt.imshow(seg_predictions[k, :, :].detach().cpu().numpy())
         #plt.colorbar()
-        plt.title('prediction')
+        plt.title('seg_prediction')
         plt.axis('off')
 
-        plt.subplot(3,1,3)
-        plt.imshow(labels[k, :, :].detach().cpu().numpy())
+        plt.subplot(3,2,4)
+        plt.imshow(reg_predictions[k, :, :].detach().cpu().numpy())
+        #plt.colorbar()
+        plt.title('reg_prediction')
         plt.axis('off')
-        plt.title('GT')
+
+        plt.subplot(3,2,5)
+        plt.imshow(reg_labels[k, :, :].detach().cpu().numpy())
+        #plt.colorbar()
+        plt.title('reg_GT')
+        plt.axis('off')
+
+        plt.subplot(3,2,3)
+        plt.imshow(seg_labels[k, :, :].detach().cpu().numpy())
+        plt.axis('off')
+        plt.title('seg_GT')
         #plt.colorbar()
         fname1 = str(str(ctr) +'_' +str(k) + '_combined' + '.png')
         plt.savefig(os.path.join(out_dir, fname1), bbox_inches='tight')
@@ -111,13 +140,14 @@ def main():
                 
             # reading data
             image = data[0].cuda()
-            labels = data[1].cuda().long()
+            seg_labels = data[1].long().cuda()
+            reg_labels = data[2].float().cuda()
 
-            predictions = model(image)
+            seg_predictions, reg_predictions = model(image)
             if i==0:
-                print('predictions size: ', predictions.shape)
+                print('predictions size: ', seg_predictions.shape)
 
-            save_batch_images(image, predictions, labels, full_dir_name, i)
+            save_batch_images(image, seg_predictions, seg_labels,reg_predictions,reg_labels, full_dir_name, i)
 
     print('All done!')
 

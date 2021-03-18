@@ -66,6 +66,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         # parcel value
         parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
         value = Image.open(parcel_fname)
+        value = transforms_function.vflip(value)
         
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:

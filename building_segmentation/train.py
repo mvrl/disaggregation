@@ -12,6 +12,7 @@ from net_factory import get_network
 from data_factory import get_data
 
 torch.backends.cudnn.benchmark = True
+torch.cuda.set_device(cfg.train.device_ids[0])
 
 model = get_network(cfg.model.name)
 
@@ -62,7 +63,7 @@ for epoch in range(cfg.train.num_epochs):
         seg_labels = data[1].long().cuda()
         reg_labels = data[2].float().cuda()
         
-        seg_predictions, reg_predictions = model(image)
+        seg_predictions = model(image)
         
         seg_loss = seg_criterion(seg_predictions, seg_labels).unsqueeze(0)
         
@@ -77,12 +78,10 @@ for epoch in range(cfg.train.num_epochs):
         #print( list(reg_predictions.size() ) )
         #print( list(seg_predictions.size() ) )
 
-        reg_predictions = torch.squeeze(reg_predictions)
 
-        reg_loss = reg_criterion( reg_predictions , reg_labels)
         #reg_loss.backward()
 
-        loss = reg_loss + seg_loss
+        loss = seg_loss 
 
         loss.backward()
 
@@ -107,13 +106,10 @@ for epoch in range(cfg.train.num_epochs):
             seg_labels = data[1].long().cuda()
             reg_labels = data[2].float().cuda()
         
-            seg_predictions, reg_predictions = model(image)
+            seg_predictions = model(image)
             seg_loss = seg_criterion(seg_predictions, seg_labels).unsqueeze(0)
 
-            reg_predictions = torch.squeeze(reg_predictions)
-            reg_loss = reg_criterion( reg_predictions , reg_labels)
-
-            loss = reg_loss + seg_loss
+            loss = seg_loss
 
             loss_val += loss.detach().cpu().item()
                 

@@ -10,14 +10,19 @@ import torchvision.transforms as transforms
 import torchvision.transforms.functional as transforms_function
 from torch.utils.data import Dataset, DataLoader
 from config import cfg
+import geopandas as gpd
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path):
+    def __init__(self, mode, data_dir, csv_path, shp_path):
         
         self.mode = mode
         self.data_dir = data_dir
 
         self.df = pd.read_csv(csv_path)
+
+        self.gdf = gpd.read_file(shp_path)
+        self.shp_path = shp.path
+        gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
         
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
@@ -30,7 +35,12 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         
     def __len__(self):
         return len(self.df)
-    
+
+
+    # default here is uniform value
+    def get_MASTER():
+        return gdf['AVERAGE_MV1']
+
     def __getitem__(self, idx):
         # Grab path from CSV dataframe
         row = self.df.iloc[idx]
@@ -52,10 +62,10 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_mask = transforms_function.vflip(parcel_mask)
 
         #Combine masks to multiclass label
-        addition_one = np.array(parcel_mask) + np.array(parcel_boundary) * 2
-        overlap_fixed = np.where(addition_one > 2, 2, addition_one)
-        addition_two  = overlap_fixed + np.array(building_mask) * 3
-        multiclass_label = np.where(addition_two > 3, 3, addition_two)
+        addition_one = np.array(parcel_mask) + np.array(building_mask) * 2
+        multiclass_label = np.where(addition_one > 2, 2, addition_one)
+        #addition_two  = overlap_fixed + np.array(building_mask) * 3
+        #multiclass_label = np.where(addition_two > 3, 3, addition_two)
         multiclass_label = np.where(multiclass_label < 0, 0, multiclass_label)
         multiclass_label = Image.fromarray(multiclass_label)
 
@@ -67,6 +77,23 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
         value = Image.open(parcel_fname)
         value = transforms_function.vflip(value)
+        parcel_fname = os.path.join(dir_path, 'value.tif')
+
+
+        row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
+        #Region Array
+        shp_filename = os.path.join(dir_path, 'parcels.shp')
+        if(os.path.exists(shp_filename)):
+            chip_gdf = gpd.read_file(shp_filename, row_bbox)
+
+            # i need to calculate the indexes here
+            # select the indexes of the main gdf with matching IDs of the chips gdf
+            for PID in chip.gdf['PID']: 
+                indexes self.gdf[self.gdf['PID'] == PID].index.tolist()
+
+        else:
+            indexes = []
+
         
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:
@@ -82,6 +109,14 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             # note: there is no random cropping yet
 
 
+
+        # Random crop
+        i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
+        
+        image = transforms_function.crop(image, i, j, h, w)
+        multiclass_label = transforms_function.crop(multiclass_label, i, j, h, w)
+        value = transforms_function.crop(value, i, j, h, w)    
+
         image = self.to_tensor(image)
         # note: no ImageNet normalization applied yet
         
@@ -89,7 +124,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         value = torch.from_numpy(np.array(value))
 
 
-        return image, multiclass_label, value
+        return image, multiclass_label, value, indexes
 
 
 def get_data(cfg, mode, data_dir=cfg.data.root_dir):
@@ -116,6 +151,7 @@ def get_data(cfg, mode, data_dir=cfg.data.root_dir):
     elif(mode == 'test'):
         data_loader = DataLoader(test_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
                              num_workers=cfg.train.num_workers)
+
     
     return data_loader
 

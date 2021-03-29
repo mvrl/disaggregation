@@ -62,6 +62,8 @@ for epoch in range(cfg.train.num_epochs):
         image = data[0].cuda()
         seg_labels = data[1].long().cuda()
         reg_labels = data[2].float().cuda()
+
+        print( seg_labels )
         
         seg_predictions = model(image)
         
@@ -154,4 +156,5 @@ with open(log_name, 'w') as result_file:
     result_file.write(str(test_loss))
     result_file.write('\nTraining loss  ')
     result_file.write(str(train_loss))
+
 

@@ -175,11 +175,19 @@ class NestedUNet(nn.Module):
 
     def forward(self, x):
 
+        #print(x.shape)
+
         x0_0 = self.conv0_0(x)
+
+        #print(x0_0.shape)
+        #print(self.pool(x0_0).shape)
         x1_0 = self.conv1_0(self.pool(x0_0))
+        #print(x1_0.shape)
         x0_1 = self.conv0_1(torch.cat([x0_0, self.Up(x1_0)], 1))
+        #print(x0_1.shape)
 
         x2_0 = self.conv2_0(self.pool(x1_0))
+        #print(x2_0.shape)
         x1_1 = self.conv1_1(torch.cat([x1_0, self.Up(x2_0)], 1))
         x0_2 = self.conv0_2(torch.cat([x0_0, x0_1, self.Up(x1_1)], 1))
 

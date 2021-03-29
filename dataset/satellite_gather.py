@@ -23,7 +23,6 @@ parser.add_argument('--path', type=str, help='Directory to download to.', defaul
 parser.add_argument('--gsd', type=int, help='Ground Sample Distance', default=1)
 args = parser.parse_args()
 
-
 def download(item):
   url = item[0]
   fn = item[1]

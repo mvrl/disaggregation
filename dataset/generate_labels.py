@@ -228,6 +228,24 @@ def raster_boundary(bbox, row_bbox, fn):
     new_rasterSRS.ImportFromEPSG(2975)
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
+def save_shp(bbox, row_bbox, fn):
+
+    gdf = gpd.read_file(parcels_file, bbox = row_bbox, driver = 'ESRI Shapefile')
+
+    gdf.crs = "EPSG:26915"
+    
+    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+
+    #bb_polygon = Polygon(row_bbox)
+
+    #df2 = gpd.GeoDataFrame(gpd.GeoSeries(bb_polygon), columns=['geometry'])
+
+    if( not gdf.empty):
+        gdf.to_file(fn)
+    else:
+        print(fn)
+
+
 # Loop through generated CSV
 if __name__ == "__main__":
 
@@ -246,6 +264,7 @@ if __name__ == "__main__":
             building_path = os.path.join(label_path, 'building_mask.tif')
             parcel_mask_path = os.path.join(label_path, 'parcel_mask.tif')
             boundary_path = os.path.join(label_path, 'parcel_boundary.tif')
+            shp_path = os.path.join(label_path, 'parcels.shp')
 
             #BBOXES with different orientations
             image_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max'])
@@ -260,5 +279,7 @@ if __name__ == "__main__":
                 raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
             if not os.path.exists(boundary_path):
                 raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
+            #if not os.path.exists(shp_path):
+            save_shp(bbox = image_bbox, row_bbox= row_bbox, fn=shp_path)
 
             pbar.update(1)

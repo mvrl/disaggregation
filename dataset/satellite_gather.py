@@ -99,7 +99,7 @@ if __name__ == "__main__":
     pass
 
 
-  csv_outfile = args.path + 'hennepin_bbox_ver1.csv'
+  csv_outfile = args.path + 'hennepin_bbox.csv'
 
   df.to_csv(csv_outfile)
 

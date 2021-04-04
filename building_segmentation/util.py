@@ -11,29 +11,36 @@ import numpy as np
 '''
 class regionAgg_layer(nn.Module):
 
-    def __init__(self, input_size, max_regions):
-        super(regional_aggregation_layer, self).__init__()
+    def __init__(self, input_size, agg_matrix):
+        super(regionAgg_layer, self).__init__()
 
         # max_regions =  number of regions in the space
-        self.max_regions = max_regions;
+        self.agg_matrix = agg_matrix;
         self.input_size = input_size
 
-        self.layer = nn.Linear(input_size,  max_regions)
-
     def forward(self, x):
-        x = layer(x)
+        x = torch.matmul(agg_matrix['mask'], x)
         return x;
 
 '''
     We need a loss that will ignore the regions not contained in the
     input image.
 
-    contained_regions are indices of the output array
+    contained_regions are are geometries/values from the loaded area
 '''
-def regionAgg_loss(output, target, contained_regions):
+def regionAgg_loss(output, agg_matrix, parcel_ids):
 
-    # np.take indexes the output
-    output = np.take(output,contained_regions)
+    #find the indexes of the contained regions in the aggregation matrix
+    target = numpy.array( agg_matrix['value'] ) 
+
+    indices = []
+
+    for id in parcel_ids:
+        indices.append( df.index[df['PID'] == id])
+
+    # np.take indexes the output and target
+    output = np.take(output,indices)
+    target = np.take(target,indices)
 
     loss = torch.mean((output - target)**2)
 

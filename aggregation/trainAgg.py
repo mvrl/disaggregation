@@ -25,20 +25,36 @@ class aggregationModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        image, value_map, parcel_masks, parcel_values = batch
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
         #take cnn output and parcel masks(Aggregation Matrix M)
-        self.agg(output, parcel_masks)
+        estimated_values = self.agg(output, parcel_masks)
 
-        loss = util.regionAgg_loss(output, target)
+        loss = util.regionAgg_loss(estimated_values, parcel_values)
         self.log('train_loss', loss)
         return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
+
+# Minibatch creation for variable size targets in Hennepin Dataset
+def my_collate(batch):
+    #batch = filter(lambda x: x is not [], batch)
+    mask = [item[1] for item in batch]
+    value = [item[2] for item in batch]
+
+    #print(mask[0].shape)
+    #print(value[0].shape)
+
+    image = [item[0].unsqueeze(0) for item in batch]
+    image = torch.cat(image)
+
+    print(image.shape)
+    return image, mask, value
+    
 
 
 
@@ -57,7 +73,7 @@ if __name__ == '__main__':
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])\
 
 
-    train_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
+    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=cfg.train.shuffle, collate_fn = my_collate,
                              num_workers=cfg.train.num_workers)
 
     model = aggregationModule()

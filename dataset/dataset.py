@@ -48,6 +48,7 @@ class HennepinDatasetFull(Dataset):
         img_path = os.path.join(self.root_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
         pthList = sorted(glob.glob(img_path + '/*.tif'))
 
+        print(img_path)
         #print(pthList)
 
         #print(img_path)

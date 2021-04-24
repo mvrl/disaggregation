@@ -13,17 +13,32 @@ class regionAgg_layer(nn.Module):
         # max_regions =  number of regions in the space
         self.input_size = input_size
 
-    def forward(self, x, parcel_masks):
-        x = torch.matmul(parcel_masks, x)
-        return x;
+    def forward(self, x, parcel_mask_batch):
+        arr = []
+
+        for i, item in enumerate(parcel_mask_batch):
+            #print(torch.tensor(item).dtype)
+            #print(x[i].T.dtype)
+
+            arr.append(torch.matmul(x[i], torch.tensor(item).T.float()))
+
+        return arr
 
 '''
-    Just MSE honestly
+    This takes lists of tensors, where each tensor is variable size. 
+    The length of each list is the batch size
 '''
-def regionAgg_loss(output, target):
+def regionAgg_loss(outputs, targets):
+    losses = []
 
-    loss = torch.mean((output - target)**2)
+    for output,target in zip(outputs,targets):
+        #print(output)
+        #print(target)
 
-    return loss
+        #target = torch.tensor(target)
+
+        losses.append( torch.mean((output - target)**2) ) 
+
+    return torch.stack(losses, dim=0).mean()
 
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py

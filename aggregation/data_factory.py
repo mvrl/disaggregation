@@ -25,17 +25,28 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.shp_path = shp_path
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
         print("Done")
+
+        print("Generating list of useful chips")
+        self.rows = []
+        for index,row in self.df.iterrows():
+            dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+            masks_dir = os.path.join(dir_path, 'masks')
+            if(os.path.isdir(masks_dir)):
+                if os.listdir(masks_dir) != []:
+                    self.rows.append(row)
+
         
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
         
     def __len__(self):
-        return len(self.df)
+        return len(self.rows)
 
     def __getitem__(self, idx):
         # Grab path from CSV dataframe
-        row = self.df.iloc[idx]
+        row = self.rows[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+        #dir_path= self.paths[idx]
 
         # Load in masks, build aggregation matrix
         masks_dir = os.path.join(dir_path, 'masks')
@@ -54,23 +65,18 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         pid = os.path.splitext(filename)[0]
                         
                         # grab the value from the gdf
-                        value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values
+                        value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+
+                        #print(value)
 
                         # now we grab each mask
                         mask = Image.open(img_path)
 
-                        # flatten the image
-                        mask = np.array(mask).flatten()
+                        
 
                         masks.append(mask)
                         values.append(value)
-
-                parcel_masks = np.vstack(masks)
-                parcel_values = np.vstack(values)
-            else:
-                parcel_masks = []
-                parcel_values = []
-
+   
 
         # image
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
@@ -82,37 +88,51 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         value_map = transforms_function.vflip(value_map)
         parcel_fname = os.path.join(dir_path, 'value.tif')
 
-
-        row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
-        #Region Array
-        shp_filename = os.path.join(dir_path, 'parcels.shp')
-        parcel_ids = []
-        if(os.path.exists(shp_filename)):
-            chip_gdf = gpd.read_file(shp_filename, row_bbox)
-            for PID in chip_gdf['PID']:
-                parcel_ids.append(PID)
         
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
                 value_map = transforms_function.hflip(value_map)
+
+                #Add loop for masks
+                masks = [transforms_function.hflip(mask) for mask in masks]
                 
             if random.random() > 0.5:
                 image = transforms_function.vflip(image)
                 value_map = transforms_function.vflip(value_map)
 
+                #Add loop for masks
+                masks = [transforms_function.vflip(mask) for mask in masks]
+
         # Random crop
         i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
         
         image = transforms_function.crop(image, i, j, h, w)
-        value_map = transforms_function.crop(value_map, i, j, h, w)    
+        value_map = transforms_function.crop(value_map, i, j, h, w)
+        masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
+
 
         image = self.to_tensor(image)
         # note: no ImageNet normalization applied yet
+
+        #Prepare masks here
+        
+        #for each mask turn to numpy array, flatten, and vstack
+        masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
+
+        # flatten the image
+        # mask = np.array(mask).flatten()
+
+        parcel_masks = np.vstack(masks)
+        parcel_values = np.vstack(values)
         
         value_map = torch.from_numpy(np.array(value_map))
 
-        return image, value_map, parcel_masks, parcel_values
+        parcel_values = torch.from_numpy(parcel_values)
+
+        return image, parcel_masks, parcel_values
+
+
 
 
 def get_data(cfg, mode, data_dir=cfg.data.root_dir):

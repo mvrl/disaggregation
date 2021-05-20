@@ -22,7 +22,7 @@ cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver1/hennepin_bbox.csv'
 cfg.train = edict()
 
 cfg.train.validation_split = 0.2         # percentage validation
-cfg.train.test_split = 0.1               # percentage test
+cfg.train.test_split = 0.2               # percentage test
 cfg.train.batch_size = 16
 cfg.train.learning_rate = 5e-4           # initial learning rate
 cfg.train.l2_reg = 1e-6

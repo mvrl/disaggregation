@@ -23,20 +23,30 @@ class regionAgg_layer(nn.Module):
 
         return arr
 
+
 '''
     This takes lists of tensors, where each tensor is variable size. 
     The length of each list is the batch size
+
+    This is really just MSE loss
 '''
 def regionAgg_loss(outputs, targets):
     losses = []
 
-    #print(targets)
-
     for output,target in zip(outputs,targets):
-
-        losses.append( torch.mean((output - target)**2) ) 
+        losses.append( torch.mean( (output - target)**2) ) 
 
     #CHANGED TO SUM HERE/ TESTING
     return torch.stack(losses, dim=0).mean()
 
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
+
+
+def MAE(outputs, targets):
+    losses = []
+
+    for output, target in zip(outputs,targets):
+
+        losses.append((output-target))
+
+    return torch.stack(losses, dim=0).mean()

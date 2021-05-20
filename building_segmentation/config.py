@@ -31,11 +31,11 @@ cfg.train.lr_decay_every = 3
 cfg.train.shuffle = True                 # shuffle training samples
 cfg.train.num_epochs = 50                # number of training epochs  ...
 cfg.train.num_workers = 4                # workers for data loading
-cfg.train.device_ids = [0,2]                 # Train on two GPUs? Set True for blackbird
+cfg.train.device_ids = [1]                 # Train on two GPUs? Set True for blackbird
 
-cfg.train.loss_weight =  [0.23498031, 0.0815268, 1.14580294]           # loss weights used during training
+cfg.train.loss_weight = [] #[0.23498031, 0.0815268, 1.14580294]           # loss weights used during training
 
-cfg.train.out_dir = './outputs/segpretrain'        # [3] fix labels, train w/ loss weights
+cfg.train.out_dir = './outputs/segpretrain2'        # [3] fix labels, train w/ loss weights
 
 # evaluation settings
 cfg.data.eval_mode = 'test'              # evaluation split. options: 'val', 'test'

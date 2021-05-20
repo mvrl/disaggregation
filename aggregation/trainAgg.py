@@ -113,6 +113,6 @@ if __name__ == '__main__':
                              num_workers=cfg.train.num_workers)
 
     model = aggregationModule()
-    trainer = pl.Trainer()
+    trainer = pl.Trainer(gpus='0')
     trainer.fit(model, train_loader)
     print('what')

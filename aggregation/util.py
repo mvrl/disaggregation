@@ -19,7 +19,7 @@ class regionAgg_layer(nn.Module):
             #print(torch.tensor(item).dtype)
             #print(x[i].T.dtype)
 
-            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float()))
+            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
 
         return arr
 

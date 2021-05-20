@@ -34,7 +34,7 @@ def regionAgg_loss(outputs, targets):
     losses = []
 
     for output,target in zip(outputs,targets):
-        losses.append( torch.mean( (output - target)**2) ) 
+        losses.append( torch.sum( (output - target)**2) ) 
 
     #CHANGED TO SUM HERE/ TESTING
     return torch.stack(losses, dim=0).mean()

@@ -46,10 +46,10 @@ class aggregationModule(pl.LightningModule):
 
         save_image(x[0], 'img1.png')
         x = self.conv(x)
-        save_image(x[0], 'img2.png')
-
         x = self.softplus(x)
 
+        save_image(x[0], 'img2.png')
+        
         #print(x[0])
 
         x = torch.flatten(x, start_dim=1)
@@ -78,6 +78,19 @@ class aggregationModule(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
+    def validation_step(self, batch, batch_idx):
+
+        image, parcel_masks, parcel_values = batch
+
+        output = self(image)
+
+        estimated_values = self.agg(output, parcel_masks)
+
+        loss = util.regionAgg_loss(estimated_values, parcel_values)
+        self.log('val_loss', loss)
+        return loss
+         
+
 # Minibatch creation for variable size targets in Hennepin Dataset
 def my_collate(batch):
 
@@ -102,17 +115,19 @@ if __name__ == '__main__':
 
     torch.manual_seed(0)
 
-    #train_size = int( np.floor( len(this_dataset) * (1-cfg.train.validation_split-cfg.train.test_split) ) )
-    #val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split) )
-    #test_size = int( np.floor( len(this_dataset) * cfg.train.test_split ) )
+    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    val_size = int( np.ceil( len(this_dataset) * cfg.train.validation_split ))
+    test_size = int(np.ceil( len(this_dataset) * cfg.train.test_split ))
 
-    #train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])\
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+                             num_workers=cfg.train.num_workers)
 
-    train_loader = DataLoader(this_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
                              num_workers=cfg.train.num_workers)
 
     model = aggregationModule()
-    trainer = pl.Trainer(gpus='0')
-    trainer.fit(model, train_loader)
-    print('what')
+    trainer = pl.Trainer(gpus='0', max_epochs = 200)
+    trainer.fit(model, train_loader, val_loader)
+    

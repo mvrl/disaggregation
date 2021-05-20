@@ -7,8 +7,8 @@ cfg = edict()
 ## MODEL
 cfg.model = edict()
 cfg.model.name = 'unet'                  # 'unet', 'unet_normalize', 'hr_net'
-cfg.model.reduction = 4                  # reduction factor for number of feature maps. 4 means a network with 1/4 feature maps
-cfg.model.out_channels = 4   
+cfg.model.reduction = 3                  # reduction factor for number of feature maps. 4 means a network with 1/4 feature maps
+cfg.model.out_channels = 3   
 
 
 ## DATA
@@ -33,9 +33,9 @@ cfg.train.num_epochs = 50                # number of training epochs  ...
 cfg.train.num_workers = 4                # workers for data loading
 cfg.train.device_ids = [0,2]                 # Train on two GPUs? Set True for blackbird
 
-cfg.train.loss_weight =  [0.23498031, 0.0815268,  2.53768995, 1.14580294]           # loss weights used during training
+cfg.train.loss_weight =  [0.23498031, 0.0815268, 1.14580294]           # loss weights used during training
 
-cfg.train.out_dir = './outputs/test'        # [3] fix labels, train w/ loss weights
+cfg.train.out_dir = './outputs/segpretrain'        # [3] fix labels, train w/ loss weights
 
 # evaluation settings
 cfg.data.eval_mode = 'test'              # evaluation split. options: 'val', 'test'

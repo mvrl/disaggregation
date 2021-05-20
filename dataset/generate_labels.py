@@ -81,9 +81,6 @@ def raster_parcel_mask(bbox, row_bbox, fn):
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
     gdf.crs = "EPSG:26915"
 
-    # Add Average Value
-    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
-
     #making the shapefile as an object.
     input_shp = ogr.Open(gdf.to_json())
 
@@ -230,7 +227,7 @@ def raster_boundary(bbox, row_bbox, fn):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 def save_shp(polygon, bbox, row_bbox, fn):
-    
+
     gdf = gpd.read_file(parcels_file, bbox = row_bbox, driver = 'ESRI Shapefile')
 
     gdf.crs = "EPSG:26915"
@@ -249,11 +246,9 @@ def save_shp(polygon, bbox, row_bbox, fn):
         print(fn)
 
 # Rasterizing building masks 
-def raster_masks(polygon, bbox, row_bbox, dir):
+def raster_masks(polygon, bbox, gdf, dir):
 
-    gdf = gpd.read_file(parcels_file, bbox = row_bbox)
-
-    gdf.set_crs("EPSG:26915")
+    
 
     for index,row in gdf.iterrows():
 
@@ -267,7 +262,7 @@ def raster_masks(polygon, bbox, row_bbox, dir):
 
         #print( region_polygon.within(polygon) )
 
-        if(region_polygon.within(polygon)):
+        if(region_polygon.within(polygon) and row['TOTAL_MV1'] > 0):
 
             #print("made it")
 
@@ -321,6 +316,13 @@ if __name__ == "__main__":
 
     bbox_df = pd.read_csv(csv_path)
 
+    gdf = gpd.read_file(parcels_file)
+
+    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+
+    gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
+
+    gdf.set_crs("EPSG:26915")
 
     print("Rasterizing each label...")
     with tqdm(total = len(bbox_df)) as pbar:
@@ -354,11 +356,11 @@ if __name__ == "__main__":
             if not os.path.exists(mask_dir):
                 os.mkdir(mask_dir)
 
-            raster_masks(polygon, image_bbox, row_bbox, mask_dir)
+            raster_masks(polygon, image_bbox, gdf, mask_dir)
 
 
             # I dont want to do this anymore
-            if not os.path.exists(shp_path):
-                save_shp(polygon,bbox = image_bbox, row_bbox= row_bbox, fn=shp_path)
+            #if not os.path.exists(shp_path):
+            #    save_shp(polygon,bbox = image_bbox, row_bbox= row_bbox, fn=shp_path)
 
             pbar.update(1)

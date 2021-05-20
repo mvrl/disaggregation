@@ -7,11 +7,10 @@ import numpy as np
 '''
 class regionAgg_layer(nn.Module):
 
-    def __init__(self, input_size):
+    def __init__(self):
         super(regionAgg_layer, self).__init__()
 
         # max_regions =  number of regions in the space
-        self.input_size = input_size
 
     def forward(self, x, parcel_mask_batch):
         arr = []
@@ -20,7 +19,7 @@ class regionAgg_layer(nn.Module):
             #print(torch.tensor(item).dtype)
             #print(x[i].T.dtype)
 
-            arr.append(torch.matmul(x[i], torch.tensor(item).T.float()))
+            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float()))
 
         return arr
 
@@ -31,14 +30,13 @@ class regionAgg_layer(nn.Module):
 def regionAgg_loss(outputs, targets):
     losses = []
 
-    for output,target in zip(outputs,targets):
-        #print(output)
-        #print(target)
+    #print(targets)
 
-        #target = torch.tensor(target)
+    for output,target in zip(outputs,targets):
 
         losses.append( torch.mean((output - target)**2) ) 
 
+    #CHANGED TO SUM HERE/ TESTING
     return torch.stack(losses, dim=0).mean()
 
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py

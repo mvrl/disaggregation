@@ -61,9 +61,9 @@ for epoch in range(cfg.train.num_epochs):
         optim.zero_grad()  # clear gradients        
         image = data[0].cuda()
         seg_labels = data[1].long().cuda()
-        reg_labels = data[2].float().cuda()
+        #reg_labels = data[2].float().cuda()
 
-        print( seg_labels )
+        #print( seg_labels )
         
         seg_predictions = model(image)
         

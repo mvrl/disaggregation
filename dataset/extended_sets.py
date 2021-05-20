@@ -47,7 +47,7 @@ class HennepinStyleTransfer(Dataset):
         i, j, h, w = transforms.RandomCrop.get_params(image_1, output_size=self.crop_size)
         a, b, c, d = transforms.RandomCrop.get_params(image_1, output_size=self.crop_size)
 
-        # TODO: check if tuple parameters are the same...
+        # TODO: check if tuple parameters are the
 
         # do the same crop on both, then do seperate crop on #1
         image1_aligned = transforms_function.crop(image_1, i, j, h, w)

@@ -23,7 +23,13 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         print("Reading GeoDataFrame...")
         self.gdf = gpd.read_file(shp_path)
         self.shp_path = shp_path
+
+        self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
+        
+        #Normalize data
+        self.gdf['AVERAGE_MV1'] = (self.gdf['AVERAGE_MV1'] - min( self.gdf['AVERAGE_MV1'] )) / ( max(self.gdf['AVERAGE_MV1']) - min(self.gdf['AVERAGE_MV1']))
+        #self.gdf['AVERAGE_MV1'] = np.log(self.gdf['AVERAGE_MV1'])
         print("Done")
 
         print("Generating list of useful chips")
@@ -35,12 +41,17 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 if os.listdir(masks_dir) != []:
                     self.rows.append(row)
 
+        #self.rows = pd.DataFrame(self.rows)
+
         
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
         
     def __len__(self):
         return len(self.rows)
+
+    def getgdf(self):
+        return self.gdf
 
     def __getitem__(self, idx):
         # Grab path from CSV dataframe
@@ -63,6 +74,12 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
                         #   Grab the PID filename
                         pid = os.path.splitext(filename)[0]
+
+                        #print(self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].size)
+
+                        #Check if the value has been cut out
+                        #if(selsf.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].size != 1):
+                        #    continue
                         
                         # grab the value from the gdf
                         value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
@@ -71,8 +88,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
                         # now we grab each mask
                         mask = Image.open(img_path)
-
-                        
 
                         masks.append(mask)
                         values.append(value)

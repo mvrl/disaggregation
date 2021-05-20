@@ -13,7 +13,7 @@ from config import cfg
 import geopandas as gpd
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path, shp_path):
+    def __init__(self, mode, data_dir, csv_path):
         
         self.mode = mode
         self.data_dir = data_dir

@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import numpy as np
 import pandas as pd
 import random
@@ -8,8 +7,7 @@ import PIL
 from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as transforms_function
-from torch.utils.data import Dataset, DataLoader
-from config import cfg
+from torch.utils.data import Dataset
 import geopandas as gpd
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
@@ -26,10 +24,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
-        
         #Normalize data
         self.gdf['AVERAGE_MV1'] = (self.gdf['AVERAGE_MV1'] - min( self.gdf['AVERAGE_MV1'] )) / ( max(self.gdf['AVERAGE_MV1']) - min(self.gdf['AVERAGE_MV1']))
-        #self.gdf['AVERAGE_MV1'] = np.log(self.gdf['AVERAGE_MV1'])
         print("Done")
 
         print("Generating list of useful chips")
@@ -41,7 +37,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 if os.listdir(masks_dir) != []:
                     self.rows.append(row)
 
-        #self.rows = pd.DataFrame(self.rows)
 
         
         self.to_tensor = transforms.ToTensor()
@@ -57,7 +52,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         # Grab path from CSV dataframe
         row = self.rows[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-        #dir_path= self.paths[idx]
 
         # Load in masks, build aggregation matrix
         masks_dir = os.path.join(dir_path, 'masks')
@@ -74,17 +68,9 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
                         #   Grab the PID filename
                         pid = os.path.splitext(filename)[0]
-
-                        #print(self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].size)
-
-                        #Check if the value has been cut out
-                        #if(selsf.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].size != 1):
-                        #    continue
                         
                         # grab the value from the gdf
                         value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
-
-                        #print(value)
 
                         # now we grab each mask
                         mask = Image.open(img_path)
@@ -92,7 +78,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         masks.append(mask)
                         values.append(value)
    
-
         # image
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
         image = Image.open(image_name)
@@ -103,7 +88,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         value_map = transforms_function.vflip(value_map)
         parcel_fname = os.path.join(dir_path, 'value.tif')
 
-        
+
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
@@ -126,7 +111,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         value_map = transforms_function.crop(value_map, i, j, h, w)
         masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
 
-
         image = self.to_tensor(image)
         # note: no ImageNet normalization applied yet
 
@@ -134,9 +118,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         
         #for each mask turn to numpy array, flatten, and vstack
         masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
-
-        # flatten the image
-        # mask = np.array(mask).flatten()
 
         parcel_masks = np.vstack(masks)
         parcel_values = np.vstack(values)
@@ -146,35 +127,3 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_values = torch.from_numpy(parcel_values)
 
         return image, parcel_masks, parcel_values
-
-
-
-
-def get_data(cfg, mode, data_dir=cfg.data.root_dir):
-    # expects a mode of dataloader
-    # valid options: 'train', 'val', 'test'
-    
-    this_dataset = dataset_hennepin(mode=mode, data_dir=data_dir, csv_path = cfg.data.csv_path)
-
-    torch.manual_seed(0)
-
-    #Split Sizes
-    train_size = int( np.floor( len(this_dataset) * (1-cfg.train.validation_split-cfg.train.test_split) ) )
-    val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split) )
-    test_size = int( np.floor( len(this_dataset) * cfg.train.test_split ) )
-
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
-
-    if(mode == 'train'):
-        data_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
-                             num_workers=cfg.train.num_workers)
-    elif(mode == 'val'):
-        data_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
-                             num_workers=cfg.train.num_workers)
-    elif(mode == 'test'):
-        data_loader = DataLoader(test_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle,
-                             num_workers=cfg.train.num_workers)
-
-    
-    return data_loader
-

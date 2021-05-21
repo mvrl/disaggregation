@@ -1,14 +1,7 @@
 import pytorch_lightning as pl
 import torch 
-import numpy as np
-import pandas as pd
-
-import data_factory
-from torch.utils.data import Dataset, DataLoader
-import torchvision.models as models
 
 from models import unet
-from config import cfg
 import util
 
 from collections import OrderedDict
@@ -40,8 +33,6 @@ class aggregationModule(pl.LightningModule):
 
 
     def forward(self, x):
-        #self.unet.eval()
-        #with torch.no_grad():
         x = self.unet(x)
 
         save_image(x[0], 'img1.png')
@@ -49,8 +40,6 @@ class aggregationModule(pl.LightningModule):
         x = self.softplus(x)
 
         save_image(x[0], 'img2.png')
-        
-        #print(x[0])
 
         x = torch.flatten(x, start_dim=1)
         return x
@@ -59,13 +48,17 @@ class aggregationModule(pl.LightningModule):
         x = self.unet(x)
         return x
 
+    def get_valOut(self, x):
+        x = self.unet(x)
+        x = self.conv(x)
+        x = self.softplus(x)
+        return x
+
     def training_step(self, batch, batch_idx):
 
         image, parcel_masks, parcel_values = batch
 
         output = self(image)
-
-        #print(parcel_values)
 
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
@@ -89,43 +82,22 @@ class aggregationModule(pl.LightningModule):
         loss = util.regionAgg_loss(estimated_values, parcel_values)
         self.log('val_loss', loss)
         return loss
-         
 
-# Minibatch creation for variable size targets in Hennepin Dataset
-def my_collate(batch):
+    def test_step(self, batch, batch_idx):
 
-    #Masks and values are in lists        
-    mask = [item[1] for item in batch]
-    value = [item[2] for item in batch]
+        image, parcel_masks, parcel_values = batch
 
+        output = self(image)
 
-    image = [item[0].unsqueeze(0) for item in batch]
-    image = torch.cat(image)
+        estimated_values = self.agg(output, parcel_masks)
 
-    return image, mask, value
-    
-
-
+        loss = util.regionAgg_loss(estimated_values, parcel_values)
+        self.log('test_loss', loss)
+        return loss
 
 if __name__ == '__main__':
 
-    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver7/',
-    '/u/eag-d1/data/Hennepin/ver7/hennepin_bbox.csv',
-    '/u/pop-d1/grad/cgar222/Projects/disaggregation/dataset/hennepin_county_parcels/hennepin_county_parcels.shp')
-
-    torch.manual_seed(0)
-
-    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
-    val_size = int( np.ceil( len(this_dataset) * cfg.train.validation_split ))
-    test_size = int(np.ceil( len(this_dataset) * cfg.train.test_split ))
-
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
-
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
-
-    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
+    train_loader, val_loader, test_loader = util.make_loaders()
 
     model = aggregationModule()
     trainer = pl.Trainer(gpus='0', max_epochs = 200)

@@ -1,14 +1,7 @@
 import pytorch_lightning as pl
-import torch 
-import numpy as np
-import pandas as pd
-
-import data_factory
-from torch.utils.data import Dataset, DataLoader
-import torchvision.models as models
+import torch
 
 from models import unet
-from config import cfg
 import util
 
 from collections import OrderedDict
@@ -16,7 +9,7 @@ import torch.nn as nn
 from torchvision.utils import save_image
 
 
-class aggregationModule(pl.LightningModule):
+class uniformModule(pl.LightningModule):
 
     def __init__(self):
         super().__init__()
@@ -41,8 +34,6 @@ class aggregationModule(pl.LightningModule):
 
 
     def forward(self, x):
-        #self.unet.eval()
-        #with torch.no_grad():
         x = self.unet(x)
 
         save_image(x[0], 'img1.png')
@@ -51,8 +42,6 @@ class aggregationModule(pl.LightningModule):
 
         save_image(x[0], 'img2.png')
         
-        #print(x[0])
-
         x = torch.flatten(x, start_dim=1)
         return x
 
@@ -66,8 +55,6 @@ class aggregationModule(pl.LightningModule):
 
         output = self(image)
 
-        #print(parcel_values)
-
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
 
@@ -78,42 +65,12 @@ class aggregationModule(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
-
-# Minibatch creation for variable size targets in Hennepin Dataset
-def my_collate(batch):
-
-    #Masks and values are in lists        
-    mask = [item[1] for item in batch]
-    value = [item[2] for item in batch]
-
-
-    image = [item[0].unsqueeze(0) for item in batch]
-    image = torch.cat(image)
-
-    return image, mask, value
     
-
-
-
 if __name__ == '__main__':
 
-    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver7/',
-    '/u/eag-d1/data/Hennepin/ver7/hennepin_bbox.csv',
-    '/u/pop-d1/grad/cgar222/Projects/disaggregation/dataset/hennepin_county_parcels/hennepin_county_parcels.shp')
+    train_loader, val_loader, test_loader = util.make_loaders()
 
-    torch.manual_seed(0)
-
-    #train_size = int( np.floor( len(this_dataset) * (1-cfg.train.validation_split-cfg.train.test_split) ) )
-    #val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split) )
-    #test_size = int( np.floor( len(this_dataset) * cfg.train.test_split ) )
-
-    #train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])\
-
-
-    train_loader = DataLoader(this_dataset, batch_size=16, shuffle=cfg.train.shuffle, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
-
-    model = aggregationModule()
+    model = uniformModule()
     trainer = pl.Trainer(gpus='0')
     trainer.fit(model, train_loader)
     print('what')

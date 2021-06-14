@@ -1,33 +1,31 @@
-from abc import abstractmethod
 import trainAgg
 import util
+from PIL import Image
+import torch
+from torchvision import transforms
+import pytorch_lightning as pl
+import matplotlib as pyplot
 
-# pick a sample image from the hennepin set
-
-path = '\u\eag-d1\data\Hennepin\something'
-# Use PIL
-# turn it into a tensor
-# give it a batch dimension
-
-def test(dataloader):
+def test(train_loader):
     # initialize 4 of the region agg networks/modules
 
     # they should have random initialization on the 4 random weights
+    model1 = trainAgg.aggregationModule()
+    model2 = trainAgg.aggregationModule()
+    model3 = trainAgg.aggregationModule()
 
-    # next get predictions for one sample image, before REGION AGG
-    # Need to create some 
+    trainer = pl.Trainer(gpus='0', max_epochs = 50)
 
-
-    # train each for maybe 100 epochs 
-    # save the weights?
-
-
-    # then get value map for each on the sample image, should be converging to something.
-
-
+    #Train them 
+    trainer.fit(model1,train_loader)
+    trainer2 = pl.Trainer(gpus='0', max_epochs = 50)
+    trainer2.fit(model2,train_loader)
+    trainer3 = pl.Trainer(gpus='0', max_epochs = 50)
+    trainer3.fit(model3,train_loader)
 
 if __name__ == '__main__':
 
+    # we can also just take an index from the loaders but that takes forever
     train_loader, val_loader, test_loader = util.make_loaders()
 
     test(train_loader)

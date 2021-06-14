@@ -28,8 +28,18 @@ def raster_parcel_values(bbox, row_bbox, fn):
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
     gdf.crs = "EPSG:26915"
 
-    # Add Average Value
+    # I need to think about this...
+    # So i need to make this like the mask raster func
+    # first pass the gdf
+    # then use polygons to cut out the non-contained
+    # then it hsould be easy to assign pixels a value
+    # This should also be only parcels fully included... i guess
+
     gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+
+    #gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
+    #Normalize...
+    #gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
 
     #making the shapefile as an object.
     input_shp = ogr.Open(gdf.to_json())
@@ -236,10 +246,6 @@ def save_shp(polygon, bbox, row_bbox, fn):
 
     gdf  = gdf[gdf.geometry.within(polygon)]
 
-    #bb_polygon = Polygon(row_bbox)
-
-    #df2 = gpd.GeoDataFrame(gpd.GeoSeries(bb_polygon), columns=['geometry'])
-
     if( not gdf.empty):
         gdf.to_file(fn, driver='GeoJSON')
     else:
@@ -247,8 +253,6 @@ def save_shp(polygon, bbox, row_bbox, fn):
 
 # Rasterizing building masks 
 def raster_masks(polygon, bbox, gdf, dir):
-
-    
 
     for index,row in gdf.iterrows():
 
@@ -321,6 +325,8 @@ if __name__ == "__main__":
     gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
 
     gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
+    #Normalize...
+    gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
 
     gdf.set_crs("EPSG:26915")
 

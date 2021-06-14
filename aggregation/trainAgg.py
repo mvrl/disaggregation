@@ -27,7 +27,7 @@ class aggregationModule(pl.LightningModule):
         for param in self.unet.parameters():
             param.requires_grad = False
 
-        self.conv = nn.Conv2d(3,1,kernel_size = 1, padding = 0)
+        self.conv = nn.Conv2d(1,1,kernel_size = 1, padding = 0)
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
 
@@ -35,8 +35,8 @@ class aggregationModule(pl.LightningModule):
     def forward(self, x):
         x = self.unet(x)
 
-        save_image(x[0], 'img1.png')
-        x = self.conv(x)
+        save_image(x[0][2], 'img1.png')
+        x = self.conv(x[:][2].unsqueeze(1))
         x = self.softplus(x)
 
         save_image(x[0], 'img2.png')
@@ -63,7 +63,7 @@ class aggregationModule(pl.LightningModule):
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
 
-        loss = util.regionAgg_loss(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values)
         self.log('train_loss', loss)
         return loss
 
@@ -79,7 +79,7 @@ class aggregationModule(pl.LightningModule):
 
         estimated_values = self.agg(output, parcel_masks)
 
-        loss = util.regionAgg_loss(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values)
         self.log('val_loss', loss)
         return loss
 

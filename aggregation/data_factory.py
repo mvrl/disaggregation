@@ -10,6 +10,10 @@ import torchvision.transforms.functional as transforms_function
 from torch.utils.data import Dataset
 import geopandas as gpd
 
+# OHHH CRAP I NEVER FLIPPED THE MASKS FOR PARCELS
+# GOD I KNEW THAT WOULD BITE ME IN THE ASS
+# I Wonder What kind of performance I can get with just that fixed
+
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
     def __init__(self, mode, data_dir, csv_path, shp_path):
         

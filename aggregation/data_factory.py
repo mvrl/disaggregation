@@ -79,6 +79,9 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         # now we grab each mask
                         mask = Image.open(img_path)
 
+                        # ADDDED
+                        mask = transforms_function.vflip(mask)
+
                         masks.append(mask)
                         values.append(value)
    

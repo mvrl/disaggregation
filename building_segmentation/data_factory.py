@@ -110,12 +110,16 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_mask = transforms_function.vflip(parcel_mask)
 
         #Combine masks to multiclass label
-        addition_one = np.array(parcel_mask) + np.array(building_mask) * 2
-        multiclass_label = np.where(addition_one > 2, 2, addition_one)
+        #addition_one = np.array(parcel_mask) + np.array(building_mask) * 2
+        #multiclass_label = np.where(addition_one > 2, 2, addition_one)
         #addition_two  = overlap_fixed + np.array(building_mask) * 3
         #multiclass_label = np.where(addition_two > 3, 3, addition_two)
+        
+        multiclass_label = np.array(building_mask)
+        #NEEDED
         multiclass_label = np.where(multiclass_label < 0, 0, multiclass_label)
         multiclass_label = Image.fromarray(multiclass_label)
+        
 
         # image
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')

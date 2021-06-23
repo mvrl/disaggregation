@@ -17,10 +17,6 @@ class regionAgg_layer(nn.Module):
     def forward(self, x, parcel_mask_batch):
         arr = []
 
-        # Okay here I need to specifically aggregate the non-parcel pixels
-        # Mat Mul the activation x[i] and the non-parcel-mask[i] for a batch
-        # I need to build a non-parcel batch in the dataloader
-
         for i, item in enumerate(parcel_mask_batch):
             #print(torch.tensor(item).dtype)
             #print(x[i].T.dtype)

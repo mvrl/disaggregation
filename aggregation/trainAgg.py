@@ -13,21 +13,21 @@ class aggregationModule(pl.LightningModule):
 
     def __init__(self):
         super().__init__()
-        self.unet = unet.Unet(in_channels=3, out_channels=3)
+        self.unet = unet.Unet(in_channels=3, out_channels=2)
 
-        state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain/model_dict.pth')
+        state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
         #Removing dictionary elements from nn.dataParrelel
-        new_state_dict = OrderedDict()
-        for k, v in state_dict.items():
-            name = k[7:] # remove module.
-            new_state_dict[name] = v
+        #new_state_dict = OrderedDict()
+        #for k, v in state_dict.items():
+        #    name = k[7:] # remove module.
+        #    new_state_dict[name] = v
 
-        self.unet.load_state_dict(new_state_dict)
+        self.unet.load_state_dict(state_dict)
 
         for param in self.unet.parameters():
             param.requires_grad = False
 
-        self.conv = nn.Conv2d(1,1,kernel_size = 1, padding = 0)
+        self.conv = nn.Conv2d(2,1,kernel_size = 1, padding = 0)
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
 
@@ -35,8 +35,8 @@ class aggregationModule(pl.LightningModule):
     def forward(self, x):
         x = self.unet(x)
 
-        save_image(x[0][2], 'img1.png')
-        x = self.conv(x[:][2].unsqueeze(1))
+        save_image(x[0], 'img1.png')
+        x = self.conv(x)
         x = self.softplus(x)
 
         save_image(x[0], 'img2.png')
@@ -97,7 +97,7 @@ class aggregationModule(pl.LightningModule):
 
 if __name__ == '__main__':
 
-    train_loader, val_loader, test_loader = util.make_loaders()
+    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 4)
 
     model = aggregationModule()
     trainer = pl.Trainer(gpus='0', max_epochs = 200)

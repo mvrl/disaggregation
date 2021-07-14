@@ -11,23 +11,30 @@ from torchvision.utils import save_image
 
 class aggregationModule(pl.LightningModule):
 
-    def __init__(self):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.Unet(in_channels=3, out_channels=2)
 
-        state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
-        #Removing dictionary elements from nn.dataParrelel
-        #new_state_dict = OrderedDict()
-        #for k, v in state_dict.items():
-        #    name = k[7:] # remove module.
-        #    new_state_dict[name] = v
+        if(use_pretrained):
+            state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
+            #Removing dictionary elements from nn.dataParrelel
+            #new_state_dict = OrderedDict()
+            #for k, v in state_dict.items():
+            #    name = k[7:] # remove module.
+            #    new_state_dict[name] = v
 
-        self.unet.load_state_dict(state_dict)
+            self.unet.load_state_dict(state_dict)
 
-        for param in self.unet.parameters():
-            param.requires_grad = False
+            for param in self.unet.parameters():
+                param.requires_grad = False
 
         self.conv = nn.Conv2d(2,1,kernel_size = 1, padding = 0)
+
+        #self.conv1 = nn.Conv2d(2,32,kernel_size = 3, padding = 1)
+        #self.conv2 = nn.Conv2d(32,64,kernel_size = 3, padding = 1)
+        #self.conv3 = nn.Conv2d(64,32,kernel_size = 3, padding = 1)
+        #self.conv4 = nn.Conv2d(32,1,kernel_size = 3, padding = 1)
+
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
 
@@ -36,7 +43,13 @@ class aggregationModule(pl.LightningModule):
         x = self.unet(x)
 
         save_image(x[0], 'img1.png')
-        x = self.conv(x)
+        #x = self.conv(x)
+
+        #x = self.conv1(x)
+        #x = self.conv2(x)
+        #x = self.conv3(x)
+        #x = self.conv4(x)
+        
         x = self.softplus(x)
 
         save_image(x[0], 'img2.png')
@@ -51,6 +64,12 @@ class aggregationModule(pl.LightningModule):
     def get_valOut(self, x):
         x = self.unet(x)
         x = self.conv(x)
+
+        #x = self.conv1(x)
+        #x = self.conv2(x)
+        #x = self.conv3(x)
+        #x = self.conv4(x)
+
         x = self.softplus(x)
         return x
 
@@ -91,15 +110,31 @@ class aggregationModule(pl.LightningModule):
 
         estimated_values = self.agg(output, parcel_masks)
 
-        loss = util.regionAgg_loss(estimated_values, parcel_values)
+        loss = util.MAE(estimated_values, parcel_values)
         self.log('test_loss', loss)
         return loss
+    
+
+    #def test(self, test_loader):
+
+        #trainer = pl.Trainer(gpus='0', max_epochs = 50)
+
+        individual_errors = []
+
+        with torch.no_grad():
+            for batch in test_loader:
+                mse = self.test_step(batch)
+                individual_errors.append(mse)
+
+        individual_errors = np.arra(individual_errors)
+
+        return individual_errors
 
 if __name__ == '__main__':
 
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 4)
 
-    model = aggregationModule()
+    model = aggregationModule(use_pretrained=True)
     trainer = pl.Trainer(gpus='0', max_epochs = 200)
     trainer.fit(model, train_loader, val_loader)
     

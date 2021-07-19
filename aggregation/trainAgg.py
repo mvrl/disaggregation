@@ -30,30 +30,13 @@ class aggregationModule(pl.LightningModule):
 
         self.conv = nn.Conv2d(2,1,kernel_size = 1, padding = 0)
 
-        #self.conv1 = nn.Conv2d(2,32,kernel_size = 3, padding = 1)
-        #self.conv2 = nn.Conv2d(32,64,kernel_size = 3, padding = 1)
-        #self.conv3 = nn.Conv2d(64,32,kernel_size = 3, padding = 1)
-        #self.conv4 = nn.Conv2d(32,1,kernel_size = 3, padding = 1)
-
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
 
-
     def forward(self, x):
         x = self.unet(x)
-
-        save_image(x[0], 'img1.png')
-        #x = self.conv(x)
-
-        #x = self.conv1(x)
-        #x = self.conv2(x)
-        #x = self.conv3(x)
-        #x = self.conv4(x)
-        
+        x = self.conv(x)
         x = self.softplus(x)
-
-        save_image(x[0], 'img2.png')
-
         x = torch.flatten(x, start_dim=1)
         return x
 
@@ -64,12 +47,6 @@ class aggregationModule(pl.LightningModule):
     def get_valOut(self, x):
         x = self.unet(x)
         x = self.conv(x)
-
-        #x = self.conv1(x)
-        #x = self.conv2(x)
-        #x = self.conv3(x)
-        #x = self.conv4(x)
-
         x = self.softplus(x)
         return x
 
@@ -114,27 +91,84 @@ class aggregationModule(pl.LightningModule):
         self.log('test_loss', loss)
         return loss
     
+class End2EndAggregationModule(pl.LightningModule):
+    def __init__(self,use_pretrained):
+        super().__init__()
+        self.unet = unet.Unet(in_channels=3, out_channels=1)
 
-    #def test(self, test_loader):
+        # This wont work, since the pretrained unet has 2 output channels
+        if(use_pretrained):
+            state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
+            self.unet.load_state_dict(state_dict)
 
-        #trainer = pl.Trainer(gpus='0', max_epochs = 50)
+            for param in self.unet.parameters():
+                param.requires_grad = False
+        
+        self.softplus = nn.Softplus()
+        self.agg = util.regionAgg_layer()
 
-        individual_errors = []
+    def forward(self, x):
+        x = self.unet(x)
+        x = self.softplus(x)
+        x = torch.flatten(x, start_dim=1)
+        return x
 
-        with torch.no_grad():
-            for batch in test_loader:
-                mse = self.test_step(batch)
-                individual_errors.append(mse)
+    def cnnOutput(self, x):
+        x = self.unet(x)
+        return x
 
-        individual_errors = np.arra(individual_errors)
+    def get_valOut(self, x):
+        x = self.unet(x)
+        x = self.softplus(x)
+        return x
 
-        return individual_errors
+    def training_step(self, batch, batch_idx):
+
+        image, parcel_masks, parcel_values = batch
+
+        output = self(image)
+
+        #take cnn output and parcel masks(Aggregation Matrix M)
+        estimated_values = self.agg(output, parcel_masks)
+
+        loss = util.MSE(estimated_values, parcel_values)
+        self.log('train_loss', loss)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
+
+    def validation_step(self, batch, batch_idx):
+
+        image, parcel_masks, parcel_values = batch
+
+        output = self(image)
+
+        estimated_values = self.agg(output, parcel_masks)
+
+        loss = util.MSE(estimated_values, parcel_values)
+        self.log('val_loss', loss)
+        return loss
+
+    def test_step(self, batch, batch_idx):
+
+        image, parcel_masks, parcel_values = batch
+
+        output = self(image)
+
+        estimated_values = self.agg(output, parcel_masks)
+
+        loss = util.MAE(estimated_values, parcel_values)
+        self.log('test_loss', loss)
+        return loss
+
 
 if __name__ == '__main__':
 
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 4)
 
-    model = aggregationModule(use_pretrained=True)
+    model = End2EndAggregationModule(use_pretrained=False)
     trainer = pl.Trainer(gpus='0', max_epochs = 200)
     trainer.fit(model, train_loader, val_loader)
     

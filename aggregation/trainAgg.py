@@ -7,6 +7,7 @@ import util
 from collections import OrderedDict
 import torch.nn as nn
 from torchvision.utils import save_image
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 class aggregationModule(pl.LightningModule):
@@ -87,7 +88,7 @@ class aggregationModule(pl.LightningModule):
 
         estimated_values = self.agg(output, parcel_masks)
 
-        loss = util.MAE(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values)
         self.log('test_loss', loss)
         return loss
     
@@ -168,7 +169,10 @@ if __name__ == '__main__':
 
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 4)
 
+    #Init ModelCheckpoint callback, monitoring 'val_loss'
+    checkpoint_callback = ModelCheckpoint(monitor='val_loss')
+
     model = End2EndAggregationModule(use_pretrained=False)
-    trainer = pl.Trainer(gpus='0', max_epochs = 200)
+    trainer = pl.Trainer(gpus='0', max_epochs = 200, callbacks=[checkpoint_callback])
     trainer.fit(model, train_loader, val_loader)
     

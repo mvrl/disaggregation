@@ -18,8 +18,6 @@ class regionAgg_layer(nn.Module):
         arr = []
 
         for i, item in enumerate(parcel_mask_batch):
-            #print(torch.tensor(item).dtype)
-            #print(x[i].T.dtype)
 
             arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
 
@@ -44,7 +42,7 @@ def MAE(outputs, targets):
 
     for output, target in zip(outputs,targets):
 
-        losses.append((output-target))
+        losses.append(np.abs(output-target))
 
     return torch.stack(losses, dim=0).mean()
 

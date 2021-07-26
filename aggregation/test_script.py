@@ -31,8 +31,8 @@ if __name__ == '__main__':
     # we can also just take an index from the loaders but that takes forever
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1)
 
-    model = trainAgg.aggregationModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_135/checkpoints/epoch=104-step=43889.ckpt', use_pretrained=False)
+    model = trainAgg.End2EndAggregationModule(use_pretrained=False)
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_155/checkpoints/epoch=160-step=67297.ckpt', use_pretrained=False)
 
     trainer.test(model, test_loader)
 

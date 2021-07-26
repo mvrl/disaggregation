@@ -4,15 +4,14 @@ import pandas as pd
 import random
 import os
 import PIL
+from tqdm import tqdm
 from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as transforms_function
 from torch.utils.data import Dataset
 import geopandas as gpd
-
-# OHHH CRAP I NEVER FLIPPED THE MASKS FOR PARCELS
-# GOD I KNEW THAT WOULD BITE ME IN THE ASS
-# I Wonder What kind of performance I can get with just that fixed
+import matplotlib.pyplot as plt
+import shapely
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
     def __init__(self, mode, data_dir, csv_path, shp_path):
@@ -27,22 +26,20 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.shp_path = shp_path
 
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
-        self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
+        #self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
         #Normalize data
-        self.gdf['AVERAGE_MV1'] = (self.gdf['AVERAGE_MV1'] - min( self.gdf['AVERAGE_MV1'] )) / ( max(self.gdf['AVERAGE_MV1']) - min(self.gdf['AVERAGE_MV1']))
+        #self.gdf['AVERAGE_MV1'] = (self.gdf['AVERAGE_MV1'] - min( self.gdf['AVERAGE_MV1'] )) / ( max(self.gdf['AVERAGE_MV1']) - min(self.gdf['AVERAGE_MV1']))
         print("Done")
 
         print("Generating list of useful chips")
         self.rows = []
-        for index,row in self.df.iterrows():
+        for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
             dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
             masks_dir = os.path.join(dir_path, 'masks')
             if(os.path.isdir(masks_dir)):
                 if os.listdir(masks_dir) != []:
                     self.rows.append(row)
 
-
-        
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
         
@@ -89,6 +86,21 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
         image = Image.open(image_name)
 
+        #Some code for generating the dasymetric maps
+        #Grab the bounding box
+        row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
+        img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
+        #Grab the polygons within using the bounding box
+        #polygons = gpd.read_file(self.shp_path, bbox = row_bbox)
+        #polygon bounding box
+        bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
+        df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
+        polygons = gpd.overlay(self.gdf, df2, how='intersection')
+
+        #Then we need to generate a map of the parcels labeled with value
+        #dasy = generate_dasymetric_map(polygons, img_bbox)
+
+
         # parcel value map
         parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
         value_map = Image.open(parcel_fname)
@@ -133,4 +145,16 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         parcel_values = torch.from_numpy(parcel_values)
 
-        return image, parcel_masks, parcel_values
+
+        sample = {'image': image,'parcel_masks': parcel_masks,
+                  'parcel_values':parcel_values,'polygons': polygons,
+                  'img_bbox': img_bbox}
+
+        return sample
+
+
+def generate_dasymetric_map(polygons, img_bbox):
+    fig, ax = plt.subplots()
+    polygons.plot(ax=ax, column = 'TOTAL_MV1', alpha = 1, linewidth=3)
+    dasy = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    return dasy

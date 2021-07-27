@@ -86,16 +86,22 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
         image = Image.open(image_name)
 
+        
         #Some code for generating the dasymetric maps
         #Grab the bounding box
         row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
         img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
-        #Grab the polygons within using the bounding box
-        #polygons = gpd.read_file(self.shp_path, bbox = row_bbox)
-        #polygon bounding box
-        bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
-        df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
-        polygons = gpd.overlay(self.gdf, df2, how='intersection')
+   
+        # We should only do this during testing since it really slows things down?
+        if(self.mode == 'test'):
+            bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
+            df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
+            df2.crs = "EPSG:26915"
+            polygons = gpd.overlay(self.gdf, df2, how='intersection')
+        else:
+            polygons = 0
+        
+
 
         #Then we need to generate a map of the parcels labeled with value
         #dasy = generate_dasymetric_map(polygons, img_bbox)

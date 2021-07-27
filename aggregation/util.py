@@ -49,7 +49,7 @@ def MAE(outputs, targets):
 def make_loaders(batch_size):
     this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver8/',
     '/u/eag-d1/data/Hennepin/ver8/hennepin_bbox.csv',
-    '/u/pop-d1/grad/cgar222/Projects/disaggregation/dataset/hennepin_county_parcels/hennepin_county_parcels.shp')
+    '/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp')
 
     torch.manual_seed(0)
 
@@ -79,10 +79,10 @@ def make_loaders(batch_size):
 def my_collate(batch):
 
     #Masks and values are in lists        
-    mask = [item[1] for item in batch]
-    value = [item[2] for item in batch]
+    mask = [item['parcel_masks'] for item in batch]
+    value = [item['parcel_values'] for item in batch]
 
-    image = [item[0].unsqueeze(0) for item in batch]
+    image = [item['image'].unsqueeze(0) for item in batch]
     image = torch.cat(image)
 
     return image, mask, value

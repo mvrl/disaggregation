@@ -53,9 +53,7 @@ class aggregationModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
@@ -72,9 +70,7 @@ class aggregationModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
@@ -86,9 +82,7 @@ class aggregationModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
@@ -131,9 +125,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
@@ -150,9 +142,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 
@@ -164,9 +154,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        image = batch['image']
-        parcel_masks=batch['parcel_masks']
-        parcel_values=['parcel_values']
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
 

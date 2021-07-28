@@ -3,3 +3,4 @@ models
 splitfiles
 __pycache__
 lightning_logs
+visualizations/*

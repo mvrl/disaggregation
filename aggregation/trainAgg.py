@@ -17,7 +17,7 @@ class aggregationModule(pl.LightningModule):
         self.unet = unet.Unet(in_channels=3, out_channels=2)
 
         if(use_pretrained):
-            state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
+            state_dict = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/buildingsegmentation_pretrained.pth')
             #Removing dictionary elements from nn.dataParrelel
             #new_state_dict = OrderedDict()
             #for k, v in state_dict.items():

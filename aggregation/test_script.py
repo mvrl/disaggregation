@@ -8,6 +8,8 @@ import pytorch_lightning as pl
 import matplotlib as pyplot
 import numpy as np
 
+# This script is for getting some test metrics for MAE or MSE on the parcel value estimation
+
 def test(self, test_loader):
 
     #trainer = pl.Trainer(gpus='0', max_epochs = 50)

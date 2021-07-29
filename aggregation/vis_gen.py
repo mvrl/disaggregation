@@ -62,9 +62,10 @@ def onexone_model():
 
 if __name__ == '__main__':
 
-    model = end2end_model()
+    #model = end2end_model()
+    model = onexone_model()
 
-    generate_images('end2end_test', model, 200)
+    generate_images('onexone_test', model, 200)
     
 
 

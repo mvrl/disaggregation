@@ -80,7 +80,7 @@ def raster_parcel_values(bbox, row_bbox, fn, gdf, polygon):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing parcel values
-def raster_parcel_mask(bbox, row_bbox, fn, parcels_file):
+def raster_parcel_mask(bbox, row_bbox, fn):
 
     # Filter shapefile
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
@@ -130,7 +130,7 @@ def raster_parcel_mask(bbox, row_bbox, fn, parcels_file):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing building masks 
-def raster_buildings(bbox, row_bbox, fn, buildings_file):
+def raster_buildings(bbox, row_bbox, fn):
 
     gdf = gpd.read_file(buildings_file, bbox = row_bbox)
 
@@ -180,7 +180,7 @@ def raster_buildings(bbox, row_bbox, fn, buildings_file):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing building masks 
-def raster_boundary(bbox, row_bbox, fn, parcels_file):
+def raster_boundary(bbox, row_bbox, fn):
 
     gdf = gpd.read_file(parcels_file, bbox = row_bbox)
 
@@ -297,9 +297,9 @@ if __name__ == "__main__":
 
     gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
 
-    gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
+    #gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
     #Normalize...
-    gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
+    #gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
 
     gdf.set_crs("EPSG:26915")
 
@@ -324,15 +324,16 @@ if __name__ == "__main__":
 
             # For each BBOX generate raster and filepath
             
-            raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_value_path, gdf=gdf, polygon=polygon)
-            #if not os.path.exists(parcel_mask_path):
-            #    raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
-            #if not os.path.exists(building_path):
-            #    raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
-            #if not os.path.exists(boundary_path):
-            #    raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
-            #if not os.path.exists(mask_dir):
-            #
-            #raster_masks(polygon, image_bbox, gdf, mask_dir)
+            #raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_value_path, gdf=gdf, polygon=polygon)
+            if not os.path.exists(parcel_mask_path):
+                raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
+            if not os.path.exists(building_path):
+                raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
+            if not os.path.exists(boundary_path):
+                raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
+            if not os.path.exists(mask_dir):
+                os.mkdir(mask_dir)
+            
+            raster_masks(polygon, image_bbox, gdf, mask_dir)
 
             pbar.update(1)

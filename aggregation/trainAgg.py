@@ -14,10 +14,10 @@ class aggregationModule(pl.LightningModule):
 
     def __init__(self, use_pretrained):
         super().__init__()
-        self.unet = unet.Unet(in_channels=3, out_channels=2)
+        self.unet = unet.UNet(in_channels=3, out_channels=2)
 
         if(use_pretrained):
-            state_dict = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/buildingsegmentation_pretrained.pth')
+            state_dict = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
             #Removing dictionary elements from nn.dataParrelel
             #new_state_dict = OrderedDict()
             #for k, v in state_dict.items():
@@ -167,12 +167,12 @@ class End2EndAggregationModule(pl.LightningModule):
 
 if __name__ == '__main__':
 
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 4)
+    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 16)
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
     checkpoint_callback = ModelCheckpoint(monitor='val_loss')
 
-    model = End2EndAggregationModule(use_pretrained=False)
+    model = aggregationModule(use_pretrained=True)
     trainer = pl.Trainer(gpus='0', max_epochs = 200, callbacks=[checkpoint_callback])
     trainer.fit(model, train_loader, val_loader)
     

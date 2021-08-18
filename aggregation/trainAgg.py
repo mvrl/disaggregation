@@ -8,11 +8,12 @@ from collections import OrderedDict
 import torch.nn as nn
 from torchvision.utils import save_image
 from pytorch_lightning.callbacks import ModelCheckpoint
+import time
+import torch.nn as nn
 
 
 class aggregationModule(pl.LightningModule):
-
-    def __init__(self, use_pretrained):
+    def __init__(self, use_pretrained, cohens=True):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
@@ -33,6 +34,9 @@ class aggregationModule(pl.LightningModule):
 
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
+        self.criterion = nn.MSELoss()
+
+        self.cohens = cohens
 
     def forward(self, x):
         x = self.unet(x)
@@ -51,46 +55,45 @@ class aggregationModule(pl.LightningModule):
         x = self.softplus(x)
         return x
 
-    def training_step(self, batch, batch_idx):
-
-        image, parcel_masks, parcel_values = batch
+    def shared_step(self, batch):
+        if self.cohens:
+            image, parcel_masks, parcel_values = batch
+        else:
+            image, parcel_masks, parcel_values, num_parcs = batch['image'], batch['parcel_masks'], batch['parcel_values'], batch['num_parcs']
+        #print(image.shape, parcel_masks.shape, parcel_values.shape, num_parcs.shape)
 
         output = self(image)
-
+        
         #take cnn output and parcel masks(Aggregation Matrix M)
-        estimated_values = self.agg(output, parcel_masks)
+        if self.cohens:
+            estimated_values = self.agg(output, parcel_masks, self.cohens)
+            loss = util.MSE(estimated_values, parcel_values, self.cohens)
+        else:
+            output = output.unsqueeze(1)
+            estimated_values = self.agg(output, parcel_masks, self.cohens, num_parcs)
+            loss = util.MSE(estimated_values, parcel_values, self.cohens, num_parcs)
+        
+        return {'loss': loss}
 
-        loss = util.MSE(estimated_values, parcel_values)
-        self.log('train_loss', loss)
-        return loss
+
+    def training_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('train_loss', output['loss'])
+        return output['loss']
+
+    def validation_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('val_loss', output['loss'])
+        return output['loss']
+
+    def test_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('test_loss', output['loss'])
+        return output['loss']
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
-
-    def validation_step(self, batch, batch_idx):
-
-        image, parcel_masks, parcel_values = batch
-
-        output = self(image)
-
-        estimated_values = self.agg(output, parcel_masks)
-
-        loss = util.MSE(estimated_values, parcel_values)
-        self.log('val_loss', loss)
-        return loss
-
-    def test_step(self, batch, batch_idx):
-
-        image, parcel_masks, parcel_values = batch
-
-        output = self(image)
-
-        estimated_values = self.agg(output, parcel_masks)
-
-        loss = util.MSE(estimated_values, parcel_values)
-        self.log('test_loss', loss)
-        return loss
     
 class End2EndAggregationModule(pl.LightningModule):
     def __init__(self,use_pretrained):
@@ -166,13 +169,20 @@ class End2EndAggregationModule(pl.LightningModule):
 
 
 if __name__ == '__main__':
-
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 16)
+    cohens = True
+    train_loader, val_loader, test_loader = util.make_loaders(cohens)
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
-    checkpoint_callback = ModelCheckpoint(monitor='val_loss')
+    ckpt_monitors = (
+        ModelCheckpoint(monitor='val_loss')
+        )
+    ckpt_monitors = ()
 
-    model = aggregationModule(use_pretrained=True)
-    trainer = pl.Trainer(gpus='0', max_epochs = 200, callbacks=[checkpoint_callback])
+    model = aggregationModule(use_pretrained=False, cohens=cohens)
+    trainer = pl.Trainer(gpus=[0], max_epochs = 1, checkpoint_callback=False, callbacks=[*ckpt_monitors])
+    t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
+    t1 = time.time()
+    print('Training completed in', t1-t0, 'secs')
+    print('Training completed in',(t1-t0)/60, 'mins')
     

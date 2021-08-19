@@ -16,8 +16,10 @@ cfg.data = edict()
 cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
 cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
-cfg.data.root_dir = '/u/eag-d1/data/Hennepin/ver1/'
-cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver1/hennepin_bbox.csv'
+cfg.data.root_dir = '/u/eag-d1/data/Hennepin/ver8/'
+cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver8/hennepin_bbox.csv'
+cfg.data.shp_path = '/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp'
+cfg.data.feather_path = '/localdisk0/SCRATCH/watch/hennepin_feathers/'    #path relative to Raven
 
 cfg.train = edict()
 

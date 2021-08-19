@@ -4,6 +4,8 @@ from easydict import EasyDict as edict
 
 cfg = edict()
 
+cfg.use_existing = True                 # use existing method for calculating loss (True) or Ben's blocking method (False)
+
 ## MODEL
 cfg.model = edict()
 cfg.model.name = 'unet'                  # 'unet', 'unet_normalize', 'hr_net'

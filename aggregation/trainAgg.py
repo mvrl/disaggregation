@@ -14,7 +14,7 @@ from config import cfg
 
 
 class aggregationModule(pl.LightningModule):
-    def __init__(self, use_pretrained, cohens=True):
+    def __init__(self, use_pretrained, use_existing=True):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
@@ -37,7 +37,7 @@ class aggregationModule(pl.LightningModule):
         self.agg = util.regionAgg_layer()
         self.criterion = nn.MSELoss()
 
-        self.cohens = cohens
+        self.use_existing = use_existing
 
     def forward(self, x):
         x = self.unet(x)
@@ -62,8 +62,8 @@ class aggregationModule(pl.LightningModule):
         output = self(image)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
-        estimated_values = self.agg(output, parcel_masks, self.cohens)
-        loss = util.MSE(estimated_values, parcel_values, self.cohens)
+        estimated_values = self.agg(output, parcel_masks, self.use_existing)
+        loss = util.MSE(estimated_values, parcel_values, self.use_existing)
         
         return {'loss': loss}
 
@@ -161,7 +161,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
 
 if __name__ == '__main__':
-    cohens = True
+    use_existing = cfg.use_existing
     train_loader, val_loader, test_loader = util.make_loaders()
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         )
     ckpt_monitors = ()
 
-    model = aggregationModule(use_pretrained=False, cohens=cohens)
+    model = aggregationModule(use_pretrained=False, use_existing=use_existing)
     trainer = pl.Trainer(gpus=[0], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)

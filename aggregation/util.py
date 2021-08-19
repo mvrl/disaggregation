@@ -14,10 +14,10 @@ class regionAgg_layer(nn.Module):
     def __init__(self):
         super(regionAgg_layer, self).__init__()
 
-    def forward(self, x, parcel_mask_batch, cohens=True):
+    def forward(self, x, parcel_mask_batch, use_existing=True):
         #x: (b, h*w)
         #parcel_mask_batch: (b, num_parc, h*w)
-        if cohens:
+        if use_existing:
             arr = []
             for i, item in enumerate(parcel_mask_batch):
                 #item: (num_parc, h*w)
@@ -32,8 +32,8 @@ class regionAgg_layer(nn.Module):
 '''
 Loss from the paper?
 '''
-def MSE(outputs, targets, cohens=True):
-    if cohens:
+def MSE(outputs, targets, use_existing=True):
+    if use_existing:
         losses = []
         for output,target in zip(outputs,targets):
             losses.append( torch.sum((output - target)**2) ) 

@@ -1,5 +1,4 @@
 import pickle
-from albumentations.augmentations.transforms import HorizontalFlip, VerticalFlip
 import torch
 import numpy as np
 import pandas as pd
@@ -14,9 +13,6 @@ from torch.utils.data import Dataset
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import shapely
-import time
-import albumentations as A
-from albumentations.pytorch.transforms import ToTensorV2
 from geofeather import to_geofeather, from_geofeather
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
@@ -28,7 +24,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.df = pd.read_csv(csv_path)
 
         print("Reading GeoDataFrame...")
-        t0 = time.time()
         feather_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.feather'))
         if os.path.exists(feather_file):
             self.gdf = from_geofeather(feather_file)
@@ -36,10 +31,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             self.gdf = gpd.read_file(shp_path)
             to_geofeather(self.gdf, feather_file)
         self.shp_path = shp_path
-        
-        t1 = time.time()
-        print(t1-t0, 'secs')
-        print((t1-t0)/60, 'mins')
 
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
         self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
@@ -58,18 +49,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
-
-        self.transforms = A.Compose([
-            #A.RandomCrop(height=256, width=256),
-            A.HorizontalFlip(),
-            A.VerticalFlip(),
-            ToTensorV2()
-        ])
-
-        self.val_transforms = A.Compose([
-            A.RandomCrop(height=256, width=256),
-            ToTensorV2()
-        ])
 
         self.max_num_parcs = 149
 

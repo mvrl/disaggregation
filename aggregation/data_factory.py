@@ -1,3 +1,4 @@
+import pickle
 from albumentations.augmentations.transforms import HorizontalFlip, VerticalFlip
 import torch
 import numpy as np
@@ -21,7 +22,7 @@ from geofeather import to_geofeather, from_geofeather
 feather_path = '/localdisk0/SCRATCH/watch/hennepin_feathers/'
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path, shp_path, cohens=True):
+    def __init__(self, mode, data_dir, csv_path, shp_path):
         
         self.mode = mode
         self.data_dir = data_dir
@@ -72,9 +73,40 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             ToTensorV2()
         ])
 
-        self.cohens = cohens
-
         self.max_num_parcs = 149
+
+        print("Loading all values...")
+        self.all_values = []
+        values_pickle_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.pkl'))
+        if os.path.exists(values_pickle_file):
+            with open(values_pickle_file, 'rb') as f:
+                self.all_values = pickle.load(f)
+        else:
+            for row in tqdm(self.rows):
+                # Grab path from CSV dataframe
+                dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+
+                # Load in masks, build aggregation matrix
+                masks_dir = os.path.join(dir_path, 'masks')
+                values = []
+
+                num_parcs = 0
+                if(os.path.isdir(masks_dir)):
+                    for filename in os.listdir(masks_dir):
+                        if(filename.endswith('.tif')):
+                            #   Grab the PID filename
+                            pid = os.path.splitext(filename)[0]
+                            
+                            # grab the value from the gdf
+                            value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+
+                            values.append(value)
+
+                            num_parcs += 1
+                values = np.stack(values)
+                self.all_values.append(values)
+            with open(values_pickle_file, 'wb') as f:
+                pickle.dump(self.all_values, f)
         
     def __len__(self):
         return len(self.rows)
@@ -83,176 +115,110 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         return self.gdf
 
     def __getitem__(self, idx):
-        if self.cohens:
-            # Grab path from CSV dataframe
-            row = self.rows[idx]
-            dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+        # Grab path from CSV dataframe
+        row = self.rows[idx]
+        dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
-            # Load in masks, build aggregation matrix
-            masks_dir = os.path.join(dir_path, 'masks')
+        # Load in masks, build aggregation matrix
+        masks_dir = os.path.join(dir_path, 'masks')
 
-            masks = []
-            values = []
+        masks = []
+        #values = []
 
-            if(os.path.isdir(masks_dir)):
-                if os.listdir(masks_dir) != []:
-                    for filename in os.listdir(masks_dir):
-                        if(filename.endswith('.tif')):
-                            # full file path
-                            img_path = os.path.join(masks_dir, filename)
+        if(os.path.isdir(masks_dir)):
+            if os.listdir(masks_dir) != []:
+                for filename in os.listdir(masks_dir):
+                    if(filename.endswith('.tif')):
+                        # full file path
+                        img_path = os.path.join(masks_dir, filename)
 
-                            #   Grab the PID filename
-                            pid = os.path.splitext(filename)[0]
-                            
-                            # grab the value from the gdf
-                            value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+                        #   Grab the PID filename
+                        #pid = os.path.splitext(filename)[0]
+                        
+                        # grab the value from the gdf
+                        #value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
 
-                            # now we grab each mask
-                            mask = Image.open(img_path)
+                        # now we grab each mask
+                        mask = Image.open(img_path)
 
-                            # ADDDED
-                            mask = transforms_function.vflip(mask)
+                        # ADDDED
+                        mask = transforms_function.vflip(mask)
 
-                            masks.append(mask)
-                            values.append(value)
-    
-            # image
-            image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
-            image = Image.open(image_name)
+                        masks.append(mask)
+                        #values.append(value)
 
-            
-            #Some code for generating the dasymetric maps
-            #Grab the bounding box
-            row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
-            img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
-    
-            # We should only do this during testing since it really slows things down?
-            if(self.mode == 'test'):
-                bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
-                df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
-                df2.crs = "EPSG:26915"
-                polygons = gpd.overlay(self.gdf, df2, how='intersection')
-            else:
-                polygons = 0
-            
+        # image
+        image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
+        image = Image.open(image_name)
 
+        
+        #Some code for generating the dasymetric maps
+        #Grab the bounding box
+        row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
+        img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
 
-            #Then we need to generate a map of the parcels labeled with value
-            #dasy = generate_dasymetric_map(polygons, img_bbox)
-
-
-            # parcel value map
-            parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
-            value_map = Image.open(parcel_fname)
-            value_map = transforms_function.vflip(value_map)
-            parcel_fname = os.path.join(dir_path, 'value.tif')
-
-
-            if self.mode == 'train':            # random flips during training
-                if random.random() > 0.5:
-                    image = transforms_function.hflip(image)
-                    value_map = transforms_function.hflip(value_map)
-
-                    #Add loop for masks
-                    masks = [transforms_function.hflip(mask) for mask in masks]
-                    
-                if random.random() > 0.5:
-                    image = transforms_function.vflip(image)
-                    value_map = transforms_function.vflip(value_map)
-
-                    #Add loop for masks
-                    masks = [transforms_function.vflip(mask) for mask in masks]
-
-            # Random crop
-            i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
-            
-            image = transforms_function.crop(image, i, j, h, w)
-            value_map = transforms_function.crop(value_map, i, j, h, w)
-            masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
-
-            image = self.to_tensor(image)
-            # note: no ImageNet normalization applied yet
-
-            #Prepare masks here
-            
-            #for each mask turn to numpy array, flatten, and vstack
-            masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
-
-            parcel_masks = np.vstack(masks)
-            parcel_values = np.vstack(values)
-            
-            value_map = torch.from_numpy(np.array(value_map))
-
-            parcel_values = torch.from_numpy(parcel_values)
-
-            sample = {'image': image,'parcel_masks': parcel_masks,
-                    'parcel_values':parcel_values,'polygons': polygons,
-                    'img_bbox': img_bbox}
+        # We should only do this during testing since it really slows things down?
+        if(self.mode == 'test'):
+            bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
+            df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
+            df2.crs = "EPSG:26915"
+            polygons = gpd.overlay(self.gdf, df2, how='intersection')
         else:
-            # Grab path from CSV dataframe
-            row = self.rows[idx]
-            dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-    
-            # image
-            image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
-            image = np.array(Image.open(image_name))
+            polygons = 0
+        
 
-            # Load in masks, build aggregation matrix
-            masks_dir = os.path.join(dir_path, 'masks')
 
-            masks = []
-            values = []
+        #Then we need to generate a map of the parcels labeled with value
+        #dasy = generate_dasymetric_map(polygons, img_bbox)
 
-            num_parcs = 0
-            if(os.path.isdir(masks_dir)):
-                if os.listdir(masks_dir) != []:
-                    for filename in os.listdir(masks_dir):
-                        if(filename.endswith('.tif')):
-                            # full file path
-                            img_path = os.path.join(masks_dir, filename)
 
-                            #   Grab the PID filename
-                            pid = os.path.splitext(filename)[0]
-                            
-                            # grab the value from the gdf
-                            value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+        # parcel value map
+        parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
+        value_map = Image.open(parcel_fname)
+        value_map = transforms_function.vflip(value_map)
+        parcel_fname = os.path.join(dir_path, 'value.tif')
 
-                            # now we grab each mask
-                            mask = Image.open(img_path)
 
-                            # ADDDED
-                            mask = transforms_function.vflip(mask)
-                            mask = np.array(mask)
+        if self.mode == 'train':            # random flips during training
+            if random.random() > 0.5:
+                image = transforms_function.hflip(image)
+                value_map = transforms_function.hflip(value_map)
 
-                            masks.append(mask)
-                            values.append(value)
+                #Add loop for masks
+                masks = [transforms_function.hflip(mask) for mask in masks]
+                
+            if random.random() > 0.5:
+                image = transforms_function.vflip(image)
+                value_map = transforms_function.vflip(value_map)
 
-                            num_parcs += 1
-            
-            masks = np.stack(masks, axis=2)
-            if masks.shape[2] < self.max_num_parcs:
-                pad = np.zeros((masks.shape[0], masks.shape[1], self.max_num_parcs-masks.shape[2]))
-                masks = np.concatenate((masks, pad), axis=2)
+                #Add loop for masks
+                masks = [transforms_function.vflip(mask) for mask in masks]
 
-            values = np.stack(values)
-            if values.shape[0] < self.max_num_parcs:
-                pad = np.zeros((self.max_num_parcs-values.shape[0],))
-                values = np.concatenate((values, pad), axis=0)
+        # Random crop
+        i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
+        
+        image = transforms_function.crop(image, i, j, h, w)
+        value_map = transforms_function.crop(value_map, i, j, h, w)
+        masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
 
-            if self.mode == 'train':
-                transformed = self.transforms(image=image, mask=masks)
-                image = transformed['image']
-                masks = transformed['mask']
-            else:
-                transformed = self.val_transforms(image=image, mask=masks)
-                image = transformed['image']
-                masks = transformed['mask']
+        image = self.to_tensor(image)
+        # note: no ImageNet normalization applied yet
 
-            parcel_masks = masks.view(self.max_num_parcs, -1)
-            parcel_values = torch.from_numpy(values)
+        #Prepare masks here
+        
+        #for each mask turn to numpy array, flatten, and vstack
+        masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
 
-            sample = {'image': image.float(),'parcel_masks': parcel_masks.float(),
-                    'parcel_values':parcel_values, 'num_parcs': num_parcs}
+        parcel_masks = np.vstack(masks)
+        parcel_values = self.all_values[idx] #np.vstack(values)
+        
+        value_map = torch.from_numpy(np.array(value_map))
+
+        parcel_values = torch.from_numpy(parcel_values)
+
+        sample = {'image': image,'parcel_masks': parcel_masks,
+                'parcel_values':parcel_values,'polygons': polygons,
+                'img_bbox': img_bbox}
         return sample
 
 

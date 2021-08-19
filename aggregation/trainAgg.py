@@ -10,6 +10,7 @@ from torchvision.utils import save_image
 from pytorch_lightning.callbacks import ModelCheckpoint
 import time
 import torch.nn as nn
+from config import cfg
 
 
 class aggregationModule(pl.LightningModule):
@@ -56,22 +57,13 @@ class aggregationModule(pl.LightningModule):
         return x
 
     def shared_step(self, batch):
-        if self.cohens:
-            image, parcel_masks, parcel_values = batch
-        else:
-            image, parcel_masks, parcel_values, num_parcs = batch['image'], batch['parcel_masks'], batch['parcel_values'], batch['num_parcs']
-        #print(image.shape, parcel_masks.shape, parcel_values.shape, num_parcs.shape)
+        image, parcel_masks, parcel_values = batch
 
         output = self(image)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
-        if self.cohens:
-            estimated_values = self.agg(output, parcel_masks, self.cohens)
-            loss = util.MSE(estimated_values, parcel_values, self.cohens)
-        else:
-            output = output.unsqueeze(1)
-            estimated_values = self.agg(output, parcel_masks, self.cohens, num_parcs)
-            loss = util.MSE(estimated_values, parcel_values, self.cohens, num_parcs)
+        estimated_values = self.agg(output, parcel_masks, self.cohens)
+        loss = util.MSE(estimated_values, parcel_values, self.cohens)
         
         return {'loss': loss}
 
@@ -170,7 +162,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
 if __name__ == '__main__':
     cohens = True
-    train_loader, val_loader, test_loader = util.make_loaders(cohens)
+    train_loader, val_loader, test_loader = util.make_loaders()
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
     ckpt_monitors = (
@@ -179,7 +171,7 @@ if __name__ == '__main__':
     ckpt_monitors = ()
 
     model = aggregationModule(use_pretrained=False, cohens=cohens)
-    trainer = pl.Trainer(gpus=[0], max_epochs = 1, checkpoint_callback=False, callbacks=[*ckpt_monitors])
+    trainer = pl.Trainer(gpus=[0], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

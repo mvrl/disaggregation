@@ -56,9 +56,7 @@ def MAE(outputs, targets):
     return torch.stack(losses, dim=0).mean()
 
 def make_loaders():
-    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver8/',
-    '/u/eag-d1/data/Hennepin/ver8/hennepin_bbox.csv',
-    '/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp')
+    this_dataset = data_factory.dataset_hennepin('train', cfg.data.root_dir, cfg.data.csv_path, cfg.data.shp_path, cfg.data.feather_path)
 
     torch.manual_seed(0)
 

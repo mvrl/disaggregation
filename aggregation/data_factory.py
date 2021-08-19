@@ -19,10 +19,8 @@ import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 from geofeather import to_geofeather, from_geofeather
 
-feather_path = '/localdisk0/SCRATCH/watch/hennepin_feathers/'
-
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path, shp_path):
+    def __init__(self, mode, data_dir, csv_path, shp_path, feather_path):
         
         self.mode = mode
         self.data_dir = data_dir

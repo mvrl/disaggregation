@@ -9,6 +9,13 @@ import torch.nn as nn
 from torchvision.utils import save_image
 from pytorch_lightning.callbacks import ModelCheckpoint
 
+'''
+    TBD:
+        -Move model selection, data-selection, epochs, hyper-parameters all to config
+        -Combine some functions (forward, CNNout, val Out)
+        - Add a model for CIFAR?
+'''
+
 
 class aggregationModule(pl.LightningModule):
 
@@ -95,11 +102,11 @@ class aggregationModule(pl.LightningModule):
 class End2EndAggregationModule(pl.LightningModule):
     def __init__(self,use_pretrained):
         super().__init__()
-        self.unet = unet.Unet(in_channels=3, out_channels=1)
+        self.unet = unet.UNet(in_channels=3, out_channels=1)
 
         # This wont work, since the pretrained unet has 2 output channels
         if(use_pretrained):
-            state_dict = torch.load('/u/pop-d1/grad/cgar222/Projects/disaggregation/building_segmentation/outputs/segpretrain2/model_dict.pth')
+            state_dict = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
             self.unet.load_state_dict(state_dict)
 
             for param in self.unet.parameters():
@@ -167,12 +174,12 @@ class End2EndAggregationModule(pl.LightningModule):
 
 if __name__ == '__main__':
 
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 16)
+    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1)
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
     checkpoint_callback = ModelCheckpoint(monitor='val_loss')
 
-    model = aggregationModule(use_pretrained=True)
+    model = End2EndAggregationModule(use_pretrained=False)
     trainer = pl.Trainer(gpus='0', max_epochs = 200, callbacks=[checkpoint_callback])
     trainer.fit(model, train_loader, val_loader)
     

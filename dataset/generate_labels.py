@@ -22,8 +22,6 @@ parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
 
-
-
 # Lets think about how this should work...
 
 # First we prune the dataset of outlier values and geometries...these become zero
@@ -37,7 +35,7 @@ def raster_parcel_values(bbox, row_bbox, fn, gdf, polygon):
     intersections = gpd.overlay(gdf, df2, how='intersection')
 
     #making the shapefile as an object.
-    input_shp = ogr.Open(intersections.to_json())
+    input_shp = ogr.Open(intersections.to_json()) 
 
     #getting layer information of shapefile.
     shp_layer = input_shp.GetLayer()
@@ -234,6 +232,8 @@ def raster_boundary(bbox, row_bbox, fn):
 # Rasterizing building masks 
 def raster_masks(polygon, bbox, gdf, dir):
 
+    indexes = []
+
     for index,row in gdf.iterrows():
 
         region_polygon = row['geometry']
@@ -241,6 +241,8 @@ def raster_masks(polygon, bbox, gdf, dir):
         fn = os.path.join(dir, str(row['PID']) + '.tif')
 
         if(region_polygon.within(polygon) and row['TOTAL_MV1'] > 0):
+
+            indexes.append(index)
 
             #making the shapefile as an object.
             input_shp = ogr.Open(gpd.GeoSeries([region_polygon]).to_json())
@@ -285,11 +287,15 @@ def raster_masks(polygon, bbox, gdf, dir):
             new_rasterSRS.ImportFromEPSG(2975)
             new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
+    return indexes
+
 
 # Loop through generated CSV
 if __name__ == "__main__":
 
     csv_path = args.dir + 'hennepin_bbox.csv'
+
+    new_shp_path = args.dir + 'hennepin.shp'
 
     bbox_df = pd.read_csv(csv_path)
 
@@ -302,6 +308,8 @@ if __name__ == "__main__":
     #gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
 
     gdf.set_crs("EPSG:26915")
+    
+    useful_indexes = []
 
     print("Rasterizing each label...")
     with tqdm(total = len(bbox_df)) as pbar:
@@ -334,6 +342,17 @@ if __name__ == "__main__":
             if not os.path.exists(mask_dir):
                 os.mkdir(mask_dir)
             
-            raster_masks(polygon, image_bbox, gdf, mask_dir)
+            indexes = raster_masks(polygon, image_bbox, gdf, mask_dir)
+            #print(indexes)
+
+            useful_indexes.extend(indexes)
+            #print(useful_indexes)
+
 
             pbar.update(1)
+
+    filtered_gdf = gdf.iloc[useful_indexes]
+
+    #print(filtered_gdf)
+
+    filtered_gdf.to_file(new_shp_path)

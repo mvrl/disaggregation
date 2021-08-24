@@ -5,6 +5,13 @@ import data_factory
 import torch
 import os
 
+'''
+    Generate Visualizations
+
+    TBD:    -generate batch-wise visualizations
+            -move arbitrary paths to config.
+'''
+
 # This is a py script of the original jupyter notebook
 # It will save all the generated visualizations to /outputs
 # Come up with some naming scheme
@@ -50,22 +57,22 @@ def generate_plot(image,vals, polygons, img_bbox, path):
 
 def end2end_model():
     model = trainAgg.End2EndAggregationModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/eag-d1/data/Hennepin/model_checkpoints/end2end.ckpt', 
+    model = model.load_from_checkpoint('/u/eag-d1/data/Hennepin/model_checkpoints/fixed.ckpt', 
         use_pretrained=False)
     return model
 
 def onexone_model():
     model = trainAgg.aggregationModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/eag-d1/data/Hennepin/model_checkpoints/pretrained1x1.ckpt', 
+    model = model.load_from_checkpoint('/u/eag-d1/data/Hennepin/model_checkpoints/UNet_pretrained1x1.ckpt', 
         use_pretrained=False)
     return model
 
 if __name__ == '__main__':
 
-    #model = end2end_model()
-    model = onexone_model()
+    model = end2end_model()
+    #model = onexone_model()
 
-    generate_images('onexone_test', model, 200)
+    generate_images('end2end_test_fixed', model, 100)
     
 
 

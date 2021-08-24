@@ -21,16 +21,23 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         self.df = pd.read_csv(csv_path)
 
+        # Reading the GDF here is a little redundant, 
         print("Reading GeoDataFrame...")
         self.gdf = gpd.read_file(shp_path)
         self.shp_path = shp_path
 
+        # this will moreso be used for plotting
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
-        self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
+
+        '''
+            NORMAlIZATION
+        '''
+        #self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         #Normalize data
-        self.gdf['AVERAGE_MV1'] = (self.gdf['AVERAGE_MV1'] - min( self.gdf['AVERAGE_MV1'] )) / ( max(self.gdf['AVERAGE_MV1']) - min(self.gdf['AVERAGE_MV1']))
+        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1']))
         print("Done")
 
+        # Some filtering is done in the dataset generation to save time. We want all patches with available masks...
         print("Generating list of useful chips")
         self.rows = []
         for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
@@ -38,8 +45,9 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             masks_dir = os.path.join(dir_path, 'masks')
             if(os.path.isdir(masks_dir)):
                 if os.listdir(masks_dir) != []:
-                    self.rows.append(row)
-
+                        self.rows.append(row)
+                                
+        #Un-used Currently
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
         
@@ -60,6 +68,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         masks = []
         values = []
 
+        # Lets gather paths and values from the gdf
         if(os.path.isdir(masks_dir)):
             if os.listdir(masks_dir) != []:
                 for filename in os.listdir(masks_dir):
@@ -67,21 +76,22 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         # full file path
                         img_path = os.path.join(masks_dir, filename)
 
-                        #   Grab the PID filename
+                        # Grab the PID filename
                         pid = os.path.splitext(filename)[0]
                         
                         # grab the value from the gdf
-                        value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+                        value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
 
                         # now we grab each mask
                         mask = Image.open(img_path)
 
-                        # ADDDED
+                        # each mask is generated upside down
                         mask = transforms_function.vflip(mask)
 
                         masks.append(mask)
                         values.append(value)
    
+        
         # image
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
         image = Image.open(image_name)
@@ -100,41 +110,39 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             polygons = gpd.overlay(self.gdf, df2, how='intersection')
         else:
             polygons = 0
-        
-
-
+    
         #Then we need to generate a map of the parcels labeled with value
         #dasy = generate_dasymetric_map(polygons, img_bbox)
 
 
         # parcel value map
-        parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
-        value_map = Image.open(parcel_fname)
-        value_map = transforms_function.vflip(value_map)
-        parcel_fname = os.path.join(dir_path, 'value.tif')
+        #parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
+        #value_map = Image.open(parcel_fname)
+        #value_map = transforms_function.vflip(value_map)
+        #parcel_fname = os.path.join(dir_path, 'value.tif')
 
 
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
-                value_map = transforms_function.hflip(value_map)
+                #value_map = transforms_function.hflip(value_map)
 
                 #Add loop for masks
                 masks = [transforms_function.hflip(mask) for mask in masks]
                 
             if random.random() > 0.5:
                 image = transforms_function.vflip(image)
-                value_map = transforms_function.vflip(value_map)
+                #value_map = transforms_function.vflip(value_map)
 
                 #Add loop for masks
                 masks = [transforms_function.vflip(mask) for mask in masks]
 
         # Random crop
-        i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
+        #i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
         
-        image = transforms_function.crop(image, i, j, h, w)
-        value_map = transforms_function.crop(value_map, i, j, h, w)
-        masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
+        #image = transforms_function.crop(image, i, j, h, w)
+        #value_map = transforms_function.crop(value_map, i, j, h, w)
+        #masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
 
         image = self.to_tensor(image)
         # note: no ImageNet normalization applied yet
@@ -147,7 +155,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_masks = np.vstack(masks)
         parcel_values = np.vstack(values)
         
-        value_map = torch.from_numpy(np.array(value_map))
+        #value_map = torch.from_numpy(np.array(value_map))
 
         parcel_values = torch.from_numpy(parcel_values)
 

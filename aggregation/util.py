@@ -6,8 +6,12 @@ from torch.utils.data.dataloader import DataLoader
 from config import cfg
 import data_factory
 import matplotlib.pyplot as plt
+
+# CIFAR code from original paper
+# https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
+
 ''' 
-    RAL Layer from paper
+    Losses
 '''
 class regionAgg_layer(nn.Module):
 
@@ -19,13 +23,12 @@ class regionAgg_layer(nn.Module):
 
         for i, item in enumerate(parcel_mask_batch):
 
+            # x[i] is per pixel value estimation, flattened
+            # item is a matrix of flattened parcel masks
+
             arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
 
         return arr
-
-'''
-Loss from the paper?
-'''
 def MSE(outputs, targets):
     losses = []
 
@@ -33,10 +36,6 @@ def MSE(outputs, targets):
         losses.append( torch.sum((output - target)**2) ) 
 
     return torch.stack(losses, dim=0).mean()
-
-# https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
-
-
 def MAE(outputs, targets):
     losses = []
 
@@ -46,16 +45,21 @@ def MAE(outputs, targets):
 
     return torch.stack(losses, dim=0).mean()
 
+'''
+    Utility Functions
+'''
+
+# Utility function to create dataloaders
 def make_loaders(batch_size):
-    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver8/',
-    '/u/eag-d1/data/Hennepin/ver8/hennepin_bbox.csv',
-    '/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp')
+    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver10/',
+    '/u/eag-d1/data/Hennepin/ver10/hennepin_bbox.csv',
+    '/u/eag-d1/data/Hennepin/ver10/hennepin.shp')
 
     torch.manual_seed(0)
 
-    print(len(this_dataset))
+    #print(len(this_dataset))
 
-    train_size = int( np.ceil( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
     val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split ))
     test_size = int(np.floor( len(this_dataset) * cfg.train.test_split ))
 
@@ -68,7 +72,7 @@ def make_loaders(batch_size):
                              num_workers=cfg.train.num_workers)
 
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
+                             num_workers=cfg.train.num_workers) # need to set the test-loader to test mode here.
 
     # set the random seed back 
     torch.random.seed()
@@ -87,6 +91,7 @@ def my_collate(batch):
 
     return image, mask, value
 
+#Uses torch_grid to make gridded images of batches, not great scaling
 def get_grids(model, data_loader):
     with torch.no_grad():
         for batch in data_loader:

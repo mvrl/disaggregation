@@ -1,3 +1,4 @@
+import pickle
 import torch
 import numpy as np
 import pandas as pd
@@ -12,9 +13,10 @@ from torch.utils.data import Dataset
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import shapely
+from geofeather import to_geofeather, from_geofeather
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path, shp_path):
+    def __init__(self, mode, data_dir, csv_path, shp_path, feather_path):
         
         self.mode = mode
         self.data_dir = data_dir
@@ -23,7 +25,12 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         # Reading the GDF here is a little redundant, 
         print("Reading GeoDataFrame...")
-        self.gdf = gpd.read_file(shp_path)
+        feather_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.feather'))
+        if os.path.exists(feather_file):
+            self.gdf = from_geofeather(feather_file)
+        else:
+            self.gdf = gpd.read_file(shp_path)
+            to_geofeather(self.gdf, feather_file)
         self.shp_path = shp_path
 
         # this will moreso be used for plotting
@@ -50,6 +57,41 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         #Un-used Currently
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
+
+        self.max_num_parcs = 149
+
+        print("Loading all values...")
+        self.all_values = []
+        values_pickle_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.pkl'))
+        if os.path.exists(values_pickle_file):
+            with open(values_pickle_file, 'rb') as f:
+                self.all_values = pickle.load(f)
+        else:
+            for row in tqdm(self.rows):
+                # Grab path from CSV dataframe
+                dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+
+                # Load in masks, build aggregation matrix
+                masks_dir = os.path.join(dir_path, 'masks')
+                values = []
+
+                num_parcs = 0
+                if(os.path.isdir(masks_dir)):
+                    for filename in os.listdir(masks_dir):
+                        if(filename.endswith('.tif')):
+                            #   Grab the PID filename
+                            pid = os.path.splitext(filename)[0]
+                            
+                            # grab the value from the gdf
+                            value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+
+                            values.append(value)
+
+                            num_parcs += 1
+                values = np.stack(values)
+                self.all_values.append(values)
+            with open(values_pickle_file, 'wb') as f:
+                pickle.dump(self.all_values, f)
         
     def __len__(self):
         return len(self.rows)
@@ -66,7 +108,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         masks_dir = os.path.join(dir_path, 'masks')
 
         masks = []
-        values = []
+        #values = []
 
         # Lets gather paths and values from the gdf
         if(os.path.isdir(masks_dir)):
@@ -80,7 +122,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         pid = os.path.splitext(filename)[0]
                         
                         # grab the value from the gdf
-                        value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
+                        #value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
 
                         # now we grab each mask
                         mask = Image.open(img_path)
@@ -89,7 +131,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                         mask = transforms_function.vflip(mask)
 
                         masks.append(mask)
-                        values.append(value)
+                        #values.append(value)
    
         
         # image
@@ -101,7 +143,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         #Grab the bounding box
         row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
         img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
-   
+
         # We should only do this during testing since it really slows things down?
         if(self.mode == 'test'):
             bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
@@ -153,17 +195,15 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
 
         parcel_masks = np.vstack(masks)
-        parcel_values = np.vstack(values)
+        parcel_values = self.all_values[idx] #np.vstack(values)
         
         #value_map = torch.from_numpy(np.array(value_map))
 
         parcel_values = torch.from_numpy(parcel_values)
 
-
         sample = {'image': image,'parcel_masks': parcel_masks,
-                  'parcel_values':parcel_values,'polygons': polygons,
-                  'img_bbox': img_bbox}
-
+                'parcel_values':parcel_values,'polygons': polygons,
+                'img_bbox': img_bbox}
         return sample
 
 

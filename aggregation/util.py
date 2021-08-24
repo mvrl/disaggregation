@@ -18,24 +18,38 @@ class regionAgg_layer(nn.Module):
     def __init__(self):
         super(regionAgg_layer, self).__init__()
 
-    def forward(self, x, parcel_mask_batch):
-        arr = []
-
-        for i, item in enumerate(parcel_mask_batch):
-
-            # x[i] is per pixel value estimation, flattened
-            # item is a matrix of flattened parcel masks
-
-            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
-
+    def forward(self, x, parcel_mask_batch, use_existing=True):
+        #x: (b, h*w)
+        #parcel_mask_batch: (b, num_parc, h*w)
+        if use_existing:
+            arr = []
+            for i, item in enumerate(parcel_mask_batch):
+                #item: (num_parc, h*w)
+                arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
+        else:
+            b = x.shape[0]
+            hw = x.shape[1]
+            block_masks = torch.block_diag(*[ torch.from_numpy(parcel_mask_batch[i]).to(x.device) for i in range(len(parcel_mask_batch)) ]).reshape(b, hw, -1)
+            arr = torch.bmm(x.unsqueeze(1), block_masks.float())
         return arr
-def MSE(outputs, targets):
-    losses = []
 
-    for output,target in zip(outputs,targets):
-        losses.append( torch.sum((output - target)**2) ) 
+'''
+Loss from the paper?
+'''
+def MSE(outputs, targets, use_existing=True):
+    if use_existing:
+        losses = []
+        for output,target in zip(outputs,targets):
+            losses.append( torch.sum((output - target)**2) ) 
+        loss = torch.stack(losses, dim=0).mean()
+    else:
+        block_parcel_values = torch.block_diag(*targets)
+        loss = torch.sum((outputs.squeeze() - block_parcel_values)**2, dim=1).mean()
+    return loss
 
-    return torch.stack(losses, dim=0).mean()
+# https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
+
+
 def MAE(outputs, targets):
     losses = []
 
@@ -45,34 +59,25 @@ def MAE(outputs, targets):
 
     return torch.stack(losses, dim=0).mean()
 
-'''
-    Utility Functions
-'''
-
-# Utility function to create dataloaders
-def make_loaders(batch_size):
-    this_dataset = data_factory.dataset_hennepin('train','/u/eag-d1/data/Hennepin/ver10/',
-    '/u/eag-d1/data/Hennepin/ver10/hennepin_bbox.csv',
-    '/u/eag-d1/data/Hennepin/ver10/hennepin.shp')
+def make_loaders():
+    this_dataset = data_factory.dataset_hennepin('train', cfg.data.root_dir, cfg.data.csv_path, cfg.data.shp_path, cfg.data.feather_path)
 
     torch.manual_seed(0)
 
-    #print(len(this_dataset))
-
-    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    train_size = int( np.ceil( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
     val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split ))
     test_size = int(np.floor( len(this_dataset) * cfg.train.test_split ))
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
+    train_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
 
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers)
+    val_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=False, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
 
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
-                             num_workers=cfg.train.num_workers) # need to set the test-loader to test mode here.
+    test_loader = DataLoader(test_dataset, batch_size=cfg.train.batch_size, shuffle=False, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
 
     # set the random seed back 
     torch.random.seed()

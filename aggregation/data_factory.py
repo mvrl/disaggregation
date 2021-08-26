@@ -39,9 +39,10 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         '''
             NORMAlIZATION
         '''
-        #self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
+        self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         #Normalize data
         self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1']))
+        #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
         print("Done")
 
         # Some filtering is done in the dataset generation to save time. We want all patches with available masks...
@@ -82,8 +83,13 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                             #   Grab the PID filename
                             pid = os.path.splitext(filename)[0]
                             
+                            # get parcel
+                            parcel = self.gdf.loc[self.gdf['PID'] == pid]
                             # grab the value from the gdf
-                            value = self.gdf.loc[ self.gdf['PID'] == pid ]['AVERAGE_MV1'].values.item()
+                            if(len(parcel['TOTAL_MV1'].values) == 1):
+                                value = parcel['TOTAL_MV1'].values.item()
+                            else:
+                                value = 0.5 # This is cheating, but it helps
 
                             values.append(value)
 

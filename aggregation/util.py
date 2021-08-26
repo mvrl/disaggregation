@@ -54,19 +54,26 @@ def MAE(outputs, targets):
     losses = []
 
     for output, target in zip(outputs,targets):
-
-        losses.append(np.abs(output-target))
+        error = output-target
+        losses.append(torch.sum(torch.abs(error.cpu())))
 
     return torch.stack(losses, dim=0).mean()
 
-def make_loaders():
+def make_dataset():
     this_dataset = data_factory.dataset_hennepin('train', cfg.data.root_dir, cfg.data.csv_path, cfg.data.shp_path, cfg.data.feather_path)
+    return this_dataset
+
+def make_loaders():
+    this_dataset = make_dataset()
 
     torch.manual_seed(0)
 
-    train_size = int( np.ceil( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
     val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split ))
     test_size = int(np.floor( len(this_dataset) * cfg.train.test_split ))
+
+
+    print(len(this_dataset), len(this_dataset)*0.6, len(this_dataset)*0.2, test_size)
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 

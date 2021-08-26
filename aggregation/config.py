@@ -18,10 +18,10 @@ cfg.data = edict()
 cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
 cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
-cfg.data.root_dir = '/u/eag-d1/data/Hennepin/ver8/'
-cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver8/hennepin_bbox.csv'
-cfg.data.shp_path = '/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp'
-cfg.data.feather_path = '/localdisk0/SCRATCH/watch/hennepin_feathers/'    #path relative to Raven
+cfg.data.root_dir = '/u/eag-d1/data/Hennepin/ver10/'
+cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver10/hennepin_bbox.csv'
+cfg.data.shp_path = '/u/eag-d1/data/Hennepin/ver10//hennepin.shp'
+cfg.data.feather_path = '/u/eag-d1/data/Hennepin/ver10/'    
 
 cfg.train = edict()
 
@@ -33,7 +33,7 @@ cfg.train.l2_reg = 1e-6
 cfg.train.lr_decay = 0.9
 cfg.train.lr_decay_every = 3
 cfg.train.shuffle = True                 # shuffle training samples
-cfg.train.num_epochs = 1                # number of training epochs  ...
+cfg.train.num_epochs = 200                # number of training epochs  ...
 cfg.train.num_workers = 8                # workers for data loading
 cfg.train.device_ids = [0,2]                 # Train on two GPUs? Set True for blackbird
 

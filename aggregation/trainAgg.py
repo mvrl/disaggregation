@@ -15,11 +15,8 @@ from config import cfg
 '''
     TBD:
         -Move model selection, data-selection, epochs, hyper-parameters all to config
-        -Combine some functions (forward, CNNout, val Out)
         - Add a model for CIFAR?
 '''
-
-
 class aggregationModule(pl.LightningModule):
     def __init__(self, use_pretrained, use_existing=True):
         super().__init__()
@@ -47,18 +44,16 @@ class aggregationModule(pl.LightningModule):
         self.use_existing = use_existing
 
     def forward(self, x):
-        x = self.unet(x)
-        x = self.conv(x)
-        x = self.softplus(x)
+        x = self.valOut(x)
         x = torch.flatten(x, start_dim=1)
         return x
 
-    def cnnOutput(self, x):
+    def cnnOut(self, x):
         x = self.unet(x)
         return x
 
-    def get_valOut(self, x):
-        x = self.unet(x)
+    def valOut(self, x):
+        x = self.cnnOut(x)
         x = self.conv(x)
         x = self.softplus(x)
         return x
@@ -73,7 +68,6 @@ class aggregationModule(pl.LightningModule):
         loss = util.MSE(estimated_values, parcel_values, self.use_existing)
         
         return {'loss': loss}
-
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
@@ -125,49 +119,36 @@ class End2EndAggregationModule(pl.LightningModule):
         x = self.softplus(x)
         return x
 
-    def training_step(self, batch, batch_idx):
-
+    def shared_step(self, batch):
         image, parcel_masks, parcel_values = batch
 
         output = self(image)
-
+        
         #take cnn output and parcel masks(Aggregation Matrix M)
-        estimated_values = self.agg(output, parcel_masks)
+        estimated_values = self.agg(output, parcel_masks, self.use_existing)
+        loss = util.MSE(estimated_values, parcel_values, self.use_existing)
+        
+        return {'loss': loss}
 
-        loss = util.MSE(estimated_values, parcel_values)
-        self.log('train_loss', loss)
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return optimizer
+    def training_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('train_loss', output['loss'])
+        return output['loss']
 
     def validation_step(self, batch, batch_idx):
-
-        image, parcel_masks, parcel_values = batch
-
-        output = self(image)
-
-        estimated_values = self.agg(output, parcel_masks)
-
-        loss = util.MSE(estimated_values, parcel_values)
-        self.log('val_loss', loss)
-        return loss
+        output = self.shared_step(batch)
+        self.log('val_loss', output['loss'])
+        return output['loss']
 
     def test_step(self, batch, batch_idx):
-
-        image, parcel_masks, parcel_values = batch
-
-        output = self(image)
-
-        estimated_values = self.agg(output, parcel_masks)
-
-        loss = util.MAE(estimated_values, parcel_values)
-        self.log('test_loss', loss)
-        return loss
+        output = self.shared_step(batch)
+        self.log('test_loss', output['loss'])
+        return output['loss']
 
 
 if __name__ == '__main__':
+
+
     use_existing = cfg.use_existing
     train_loader, val_loader, test_loader = util.make_loaders()
 
@@ -177,7 +158,7 @@ if __name__ == '__main__':
         )
     ckpt_monitors = ()
 
-    model = aggregationModule(use_pretrained=False, use_existing=use_existing)
+    model = End2EndAggregationModule(use_pretrained=False)
     trainer = pl.Trainer(gpus=[0], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)

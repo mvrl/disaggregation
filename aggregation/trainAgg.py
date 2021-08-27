@@ -89,7 +89,7 @@ class aggregationModule(pl.LightningModule):
         return optimizer
     
 class End2EndAggregationModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
+    def __init__(self,use_pretrained, use_existing):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=1)
 
@@ -103,6 +103,8 @@ class End2EndAggregationModule(pl.LightningModule):
         
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
+
+        self.use_existing = use_existing
 
     def forward(self, x):
         x = self.unet(x)
@@ -145,6 +147,10 @@ class End2EndAggregationModule(pl.LightningModule):
         self.log('test_loss', output['loss'])
         return output['loss']
 
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
+
 
 if __name__ == '__main__':
 
@@ -158,8 +164,8 @@ if __name__ == '__main__':
         )
     ckpt_monitors = ()
 
-    model = End2EndAggregationModule(use_pretrained=False)
-    trainer = pl.Trainer(gpus=[0], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
+    model = End2EndAggregationModule(use_pretrained=False, use_existing= True)
+    trainer = pl.Trainer(gpus=[1], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

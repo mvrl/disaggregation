@@ -7,7 +7,7 @@ from osgeo import ogr
 import geopandas as gpd
 import argparse
 import shapely
-
+from geofeather import to_geofeather, from_geofeather
 
 # Code modifed from here
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
@@ -21,6 +21,8 @@ args = parser.parse_args()
 parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
+
+
 
 # Lets think about how this should work...
 
@@ -293,15 +295,28 @@ def raster_masks(polygon, bbox, gdf, dir):
 # Loop through generated CSV
 if __name__ == "__main__":
 
+    shp_path = parcels_file
+
     csv_path = args.dir + 'hennepin_bbox.csv'
 
     new_shp_path = args.dir + 'hennepin.shp'
 
+    feather_path = args.dir    
     bbox_df = pd.read_csv(csv_path)
 
-    gdf = gpd.read_file(parcels_file)
+    print("using Geofeather")
+    feather_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.feather'))
+    if os.path.exists(feather_file):
+        gdf = from_geofeather(feather_file)
+    else:
+        gdf = gpd.read_file(shp_path)
+        to_geofeather(gdf, feather_file)
+    #shp_path = shp_path
 
-    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+    print( "done")
+
+    #gdf = gpd.read_file(parcels_file)
+
 
     #gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
     #Normalize...

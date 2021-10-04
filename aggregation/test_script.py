@@ -31,10 +31,10 @@ if __name__ == '__main__':
     trainer = pl.Trainer(gpus='0', max_epochs = 200)
 
     # we can also just take an index from the loaders but that takes forever
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1)
+    train_loader, val_loader, test_loader = util.make_loaders()
 
-    model = trainAgg.End2EndAggregationModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_155/checkpoints/epoch=160-step=67297.ckpt', use_pretrained=False)
+    model = trainAgg.End2EndAggregationModule(use_pretrained=False, use_existing= True)
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', use_pretrained=False, use_existing = True)
 
     trainer.test(model, test_loader)
 

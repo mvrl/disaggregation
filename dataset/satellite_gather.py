@@ -19,7 +19,7 @@ https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSSer
 https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_Imagery_2019_6IN_WGS84WM/MapServer
 '''
 parser = argparse.ArgumentParser(description='Download Image Set to folder')
-parser.add_argument('--path', type=str, help='Directory to download to.', default= './downloads/')
+parser.add_argument('--dir', type=str, help='Directory to download to.', default= './downloads/')
 parser.add_argument('--gsd', type=int, help='Ground Sample Distance', default=1)
 args = parser.parse_args()
 
@@ -45,10 +45,17 @@ if __name__ == "__main__":
   delta_X = image_width / 2
 
   #ESPG:26915 - meters
-  X_min_bound = 440000  
-  X_max_bound = 473000
-  Y_min_bound = 4974000
-  Y_max_bound = 4988000
+  # OLD SCAN AREA 
+  #X_min_bound = 440000  
+  #X_max_bound = 473000
+  #Y_min_bound = 4974000
+  #Y_max_bound = 4988000
+
+  # NEW SCAN AREA
+  X_min_bound = 461500  
+  X_max_bound = 481800
+  Y_min_bound = 4969500
+  Y_max_bound = 4985000
 
   #Mesh
   X = np.arange( X_min_bound, X_max_bound, step = image_width )
@@ -86,7 +93,7 @@ if __name__ == "__main__":
                                       row['lat_max'], row['lon_max'])
                                       
       print(image_url)
-      out_file = args.path + "{:}/{:}/{:}_{:}.tif".format(
+      out_file = args.dir + "{:}/{:}/{:}_{:}.tif".format(
           int(row['lat_mid']), int(row['lon_mid']),
           row['lat_mid'], row['lon_mid'])
       jobs.append([image_url, out_file])
@@ -99,7 +106,7 @@ if __name__ == "__main__":
     pass
 
 
-  csv_outfile = args.path + 'hennepin_bbox.csv'
+  csv_outfile = args.dir+ 'hennepin_bbox.csv'
 
   df.to_csv(csv_outfile)
 

@@ -18,12 +18,12 @@ cfg.data = edict()
 cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
 cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
-cfg.data.root_dir = '/u/eag-d1/data/Hennepin/ver10/'
-cfg.data.csv_path = '/u/eag-d1/data/Hennepin/ver10/hennepin_bbox.csv'
-cfg.data.shp_path = '/u/eag-d1/data/Hennepin/ver10//hennepin.shp'
-cfg.data.feather_path = '/u/eag-d1/data/Hennepin/ver10/'    
+cfg.data.root_dir = '/u/eag-d1/data/Hennepin/new_area/'
+
 
 cfg.train = edict()
+
+cfg.mode = 'train'
 
 cfg.train.validation_split = 0.2         # percentage validation
 cfg.train.test_split = 0.2               # percentage test
@@ -35,7 +35,7 @@ cfg.train.lr_decay_every = 3
 cfg.train.shuffle = True                 # shuffle training samples
 cfg.train.num_epochs = 200                # number of training epochs  ...
 cfg.train.num_workers = 8                # workers for data loading
-cfg.train.device_ids = [1,2]                 # Train on two GPUs? Set True for blackbird
+cfg.train.device_ids = [2]                 # Train on two GPUs? Set True for blackbird
 
 cfg.train.loss_weight =  [0.23498031, 0.0815268,  2.53768995, 1.14580294]           # loss weights used during training
 

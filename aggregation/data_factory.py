@@ -13,24 +13,33 @@ from torch.utils.data import Dataset
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import shapely
+
 from geofeather import to_geofeather, from_geofeather
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, csv_path, shp_path, feather_path):
+    def __init__(self, mode, data_dir):
         
         self.mode = mode
         self.data_dir = data_dir
+
+        #handling paths
+        csv_path = os.path.join(self.data_dir, 'hennepin_bbox.csv')
+        shp_path = os.path.join(self.data_dir, 'hennepin.shp')
+        feather_path = os.path.join(self.data_dir, 'hennepin.feather')
+
+        values_pickle_file = os.path.join(self.data_dir, 'hennepin_vals.pkl')
+        masks_pickle_file = os.path.join(self.data_dir, 'hennepin_masks.pkl')
+        paths_pickle_file = os.path.join(self.data_dir, 'hennepin_paths.pkl')
 
         self.df = pd.read_csv(csv_path)
 
         # Reading the GDF here is a little redundant, 
         print("Reading GeoDataFrame...")
-        feather_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.feather'))
-        if os.path.exists(feather_file):
-            self.gdf = from_geofeather(feather_file)
+        if os.path.exists(feather_path):
+            self.gdf = from_geofeather(feather_path)
         else:
             self.gdf = gpd.read_file(shp_path)
-            to_geofeather(self.gdf, feather_file)
+            to_geofeather(self.gdf, feather_path)
         self.shp_path = shp_path
 
         # this will moreso be used for plotting
@@ -39,47 +48,59 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         '''
             NORMAlIZATION
         '''
+        #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         #Normalize data
-        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1']))
+        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000 
         #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
         print("Done")
 
         # Some filtering is done in the dataset generation to save time. We want all patches with available masks...
         print("Generating list of useful chips")
-        self.rows = []
-        for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
-            dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-            masks_dir = os.path.join(dir_path, 'masks')
-            if(os.path.isdir(masks_dir)):
-                if os.listdir(masks_dir) != []:
-                        self.rows.append(row)
+        #self.rows = []
+        #for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
+        #    dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
+        #    masks_dir = os.path.join(dir_path, 'masks')
+        #    if(os.path.isdir(masks_dir)):
+        #        for filename in os.listdir(masks_dir):
+        #                if(filename.endswith('.tif')):
+
+   #             if os.listdir(masks_dir) != []:
+   #                     self.rows.append(row)
                                 
         #Un-used Currently
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
 
-        self.max_num_parcs = 149
 
         print("Loading all values...")
         self.all_values = []
-        values_pickle_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.pkl'))
+        self.all_mask_paths = []
+        self.all_rows = []
+
         if os.path.exists(values_pickle_file):
             with open(values_pickle_file, 'rb') as f:
                 self.all_values = pickle.load(f)
+            with open(masks_pickle_file, 'rb') as f:
+                self.all_mask_paths = pickle.load(f)
+            with open(paths_pickle_file, 'rb') as f:
+                self.all_rows = pickle.load(f)
         else:
-            for row in tqdm(self.rows):
+            for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
                 # Grab path from CSV dataframe
                 dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
                 # Load in masks, build aggregation matrix
                 masks_dir = os.path.join(dir_path, 'masks')
                 values = []
+                masks = []
 
-                num_parcs = 0
                 if(os.path.isdir(masks_dir)):
                     for filename in os.listdir(masks_dir):
                         if(filename.endswith('.tif')):
+
+                            img_path = os.path.join(masks_dir, filename)
+
                             #   Grab the PID filename
                             pid = os.path.splitext(filename)[0]
                             
@@ -89,55 +110,76 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                             if(len(parcel['TOTAL_MV1'].values) == 1):
                                 value = parcel['TOTAL_MV1'].values.item()
                             else:
-                                value = 0.5 # This is cheating, but it helps
-
+                                #print("skipping a thing")
+                                continue
+                            
                             values.append(value)
+                            masks.append(img_path)
+                if values != []:
+                    values = np.stack(values)
+                    self.all_values.append(values)
+                    self.all_mask_paths.append(masks)
+                    self.all_rows.append(row)
 
-                            num_parcs += 1
-                values = np.stack(values)
-                self.all_values.append(values)
             with open(values_pickle_file, 'wb') as f:
                 pickle.dump(self.all_values, f)
+            with open(masks_pickle_file, 'wb') as f:
+                pickle.dump(self.all_mask_paths, f)
+            with open(paths_pickle_file, 'wb') as f:
+                pickle.dump(self.all_rows, f)
         
     def __len__(self):
-        return len(self.rows)
+        return len(self.all_rows)
 
     def getgdf(self):
         return self.gdf
+    
+    def set_mode(self, mode):
+        self.mode = mode
 
     def __getitem__(self, idx):
         # Grab path from CSV dataframe
-        row = self.rows[idx]
+        row = self.all_rows[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
         # Load in masks, build aggregation matrix
-        masks_dir = os.path.join(dir_path, 'masks')
+        #masks_dir = os.path.join(dir_path, 'masks')
 
-        masks = []
+        #masks = []
         #values = []
 
         # Lets gather paths and values from the gdf
-        if(os.path.isdir(masks_dir)):
-            if os.listdir(masks_dir) != []:
-                for filename in os.listdir(masks_dir):
-                    if(filename.endswith('.tif')):
-                        # full file path
-                        img_path = os.path.join(masks_dir, filename)
-
-                        # Grab the PID filename
-                        pid = os.path.splitext(filename)[0]
-                        
-                        # grab the value from the gdf
-                        #value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
-
-                        # now we grab each mask
-                        mask = Image.open(img_path)
+        #if(os.path.isdir(masks_dir)):
+        #    if os.listdir(masks_dir) != []:
+        #        for filename in os.listdir(masks_dir):
+        #            if(filename.endswith('.tif')):
+        #                # full file path
+        #                img_path = os.path.join(masks_dir, filename)
+        #
+        #                # Grab the PID filename
+        #                pid = os.path.splitext(filename)[0]
+        #                
+        #                # grab the value from the gdf
+        #                #value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
+        #
+        #                # now we grab each mask
+        #                mask = Image.open(img_path)
 
                         # each mask is generated upside down
-                        mask = transforms_function.vflip(mask)
+        #                        mask = transforms_function.vflip(mask)
 
-                        masks.append(mask)
-                        #values.append(value)
+        #                masks.append(mask)
+        #               #values.append(value)
+        masks = []
+        for mask_path in self.all_mask_paths[idx]:
+            # now we grab each mask
+            mask = Image.open(mask_path)
+
+            # each mask is generated upside down
+            mask = transforms_function.vflip(mask)
+
+            masks.append(mask)
+
    
         
         # image

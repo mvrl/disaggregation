@@ -1,23 +1,24 @@
+# Requirements
 import pytorch_lightning as pl
 import torch 
 
+#Local
 from models import unet
 import util
+from config import cfg
 
-from collections import OrderedDict
-import torch.nn as nn
-from torchvision.utils import save_image
+# Testing, small imports
 from pytorch_lightning.callbacks import ModelCheckpoint
 import time
 import torch.nn as nn
-from config import cfg
+
 
 '''
     TBD:
         -Move model selection, data-selection, epochs, hyper-parameters all to config
         - Add a model for CIFAR?
 '''
-class aggregationModule(pl.LightningModule):
+class OnexOneAggregationModule(pl.LightningModule):
     def __init__(self, use_pretrained, use_existing=True):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
@@ -58,6 +59,11 @@ class aggregationModule(pl.LightningModule):
         x = self.softplus(x)
         return x
 
+    def pred_Out(self, x, masks):
+         output = self(x)
+         estimated_values = self.agg(output, masks, self.use_existing)
+         return estimated_values
+        
     def shared_step(self, batch):
         image, parcel_masks, parcel_values = batch
 
@@ -121,6 +127,11 @@ class End2EndAggregationModule(pl.LightningModule):
         x = self.softplus(x)
         return x
 
+    def pred_Out(self, x, masks):
+         output = self(x)
+         estimated_values = self.agg(output, masks, self.use_existing)
+         return estimated_values
+
     def shared_step(self, batch):
         image, parcel_masks, parcel_values = batch
 
@@ -152,6 +163,14 @@ class End2EndAggregationModule(pl.LightningModule):
         return optimizer
 
 
+def chooseModel():
+
+    if cfg.model == "end2end":
+        model = End2EndAggregationModule(use_pretrained=False, use_existing= True)
+    if cfg.model == "1x1":
+        model = OnexOneAggregationModule(use_pretrained=False, use_existing= True)
+    return model
+
 if __name__ == '__main__':
 
 
@@ -164,8 +183,8 @@ if __name__ == '__main__':
         )
     ckpt_monitors = ()
 
-    model = End2EndAggregationModule(use_pretrained=False, use_existing= True)
-    trainer = pl.Trainer(gpus=[1], max_epochs = cfg.train.num_epochs, checkpoint_callback=False, callbacks=[*ckpt_monitors])
+    model = OnexOneAggregationModule(use_pretrained=False, use_existing= True)
+    trainer = pl.Trainer(gpus=[3], max_epochs = cfg.train.num_epochs, checkpoint_callback=True, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

@@ -25,13 +25,25 @@ class regionAgg_layer(nn.Module):
             arr = []
             for i, item in enumerate(parcel_mask_batch):
                 #item: (num_parc, h*w)
-                arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
+                arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
         else:
             b = x.shape[0]
             hw = x.shape[1]
             block_masks = torch.block_diag(*[ torch.from_numpy(parcel_mask_batch[i]).to(x.device) for i in range(len(parcel_mask_batch)) ]).reshape(b, hw, -1)
             arr = torch.bmm(x.unsqueeze(1), block_masks.float())
         return arr
+
+class chip_value_sum(nn.Module):
+
+    def __init__(self):
+        super(chip_value_sum, self).__init__()
+
+    def forward(self, x, parcel_mask_batch):
+        arr = []
+        for i, item in enumerate(parcel_mask_batch):
+            #item: (num_parc, h*w)
+            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
+
 
 '''
 Loss from the paper?
@@ -59,31 +71,31 @@ def MAE(outputs, targets):
 
     return torch.stack(losses, dim=0).mean()
 
-def make_dataset():
-    this_dataset = data_factory.dataset_hennepin('train', cfg.data.root_dir, cfg.data.csv_path, cfg.data.shp_path, cfg.data.feather_path)
+def make_dataset(mode):
+    this_dataset = data_factory.dataset_hennepin(mode, cfg.data.root_dir)
     return this_dataset
 
-def make_loaders():
-    this_dataset = make_dataset()
+def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode):
+    this_dataset = make_dataset(mode)
 
     torch.manual_seed(0)
 
-    train_size = int( np.floor( len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
-    val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split ))
-    test_size = int(np.floor( len(this_dataset) * cfg.train.test_split ))
+    train_size = int( np.round(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
+    test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
 
 
     print(len(this_dataset), len(this_dataset)*0.6, len(this_dataset)*0.2, test_size)
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
-    val_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=False, collate_fn = my_collate,
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
-    test_loader = DataLoader(test_dataset, batch_size=cfg.train.batch_size, shuffle=False, collate_fn = my_collate,
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = test_collate,
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 
@@ -102,6 +114,22 @@ def my_collate(batch):
     image = torch.cat(image)
 
     return image, mask, value
+
+# Minibatch creation for variable size targets in Hennepin Dataset
+def test_collate(batch):
+
+    #Masks and values are in lists        
+    mask = [item['parcel_masks'] for item in batch]
+    value = [item['parcel_values'] for item in batch]
+
+    image = [item['image'].unsqueeze(0) for item in batch]
+    image = torch.cat(image)
+
+    polygons = [item['polygons'] for item in batch]
+    img_bbox = [item['img_bbox'] for item in batch]
+
+    return image, mask, value, polygons, img_bbox
+
 
 #Uses torch_grid to make gridded images of batches, not great scaling
 def get_grids(model, data_loader):

@@ -19,17 +19,12 @@ import torch.nn as nn
         - Add a model for CIFAR?
 '''
 class OnexOneAggregationModule(pl.LightningModule):
-    def __init__(self, use_pretrained, use_existing=True):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
         if(use_pretrained):
             state_dict = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-            #Removing dictionary elements from nn.dataParrelel
-            #new_state_dict = OrderedDict()
-            #for k, v in state_dict.items():
-            #    name = k[7:] # remove module.
-            #    new_state_dict[name] = v
 
             self.unet.load_state_dict(state_dict)
 
@@ -41,8 +36,6 @@ class OnexOneAggregationModule(pl.LightningModule):
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
         self.criterion = nn.MSELoss()
-
-        self.use_existing = use_existing
 
     def forward(self, x):
         x = self.valOut(x)
@@ -61,7 +54,7 @@ class OnexOneAggregationModule(pl.LightningModule):
 
     def pred_Out(self, x, masks):
          output = self(x)
-         estimated_values = self.agg(output, masks, self.use_existing)
+         estimated_values = self.agg(output, masks)
          return estimated_values
         
     def shared_step(self, batch):
@@ -70,8 +63,8 @@ class OnexOneAggregationModule(pl.LightningModule):
         output = self(image)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
-        estimated_values = self.agg(output, parcel_masks, self.use_existing)
-        loss = util.MSE(estimated_values, parcel_values, self.use_existing)
+        estimated_values = self.agg(output, parcel_masks)
+        loss = util.MAE(estimated_values, parcel_values)
         
         return {'loss': loss}
 
@@ -95,7 +88,7 @@ class OnexOneAggregationModule(pl.LightningModule):
         return optimizer
     
 class End2EndAggregationModule(pl.LightningModule):
-    def __init__(self,use_pretrained, use_existing):
+    def __init__(self,use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=1)
 
@@ -110,7 +103,6 @@ class End2EndAggregationModule(pl.LightningModule):
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
 
-        self.use_existing = use_existing
 
     def forward(self, x):
         x = self.unet(x)
@@ -129,7 +121,7 @@ class End2EndAggregationModule(pl.LightningModule):
 
     def pred_Out(self, x, masks):
          output = self(x)
-         estimated_values = self.agg(output, masks, self.use_existing)
+         estimated_values = self.agg(output, masks)
          return estimated_values
 
     def shared_step(self, batch):
@@ -138,8 +130,8 @@ class End2EndAggregationModule(pl.LightningModule):
         output = self(image)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
-        estimated_values = self.agg(output, parcel_masks, self.use_existing)
-        loss = util.MSE(estimated_values, parcel_values, self.use_existing)
+        estimated_values = self.agg(output, parcel_masks)
+        loss = util.MAE(estimated_values, parcel_values)
         
         return {'loss': loss}
 
@@ -166,15 +158,14 @@ class End2EndAggregationModule(pl.LightningModule):
 def chooseModel():
 
     if cfg.model == "end2end":
-        model = End2EndAggregationModule(use_pretrained=False, use_existing= True)
+        model = End2EndAggregationModule(use_pretrained=False)
     if cfg.model == "1x1":
-        model = OnexOneAggregationModule(use_pretrained=False, use_existing= True)
+        model = OnexOneAggregationModule(use_pretrained=False)
     return model
 
 if __name__ == '__main__':
 
 
-    use_existing = cfg.use_existing
     train_loader, val_loader, test_loader = util.make_loaders()
 
     #Init ModelCheckpoint callback, monitoring 'val_loss'
@@ -183,8 +174,8 @@ if __name__ == '__main__':
         )
     ckpt_monitors = ()
 
-    model = OnexOneAggregationModule(use_pretrained=False, use_existing= True)
-    trainer = pl.Trainer(gpus=[3], max_epochs = cfg.train.num_epochs, checkpoint_callback=True, callbacks=[*ckpt_monitors])
+    model = End2EndAggregationModule(use_pretrained=False)
+    trainer = pl.Trainer(gpus=[1], max_epochs = cfg.train.num_epochs, checkpoint_callback=True, callbacks=[*ckpt_monitors])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

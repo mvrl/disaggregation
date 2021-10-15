@@ -25,6 +25,20 @@ def test(self, test_loader):
 
     return individual_errors
 
+def end2end_model():
+    model = trainAgg.End2EndAggregationModule(use_pretrained=False, use_existing=True)
+    #'/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt' NEWEST
+    # september '/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_206/checkpoints/epoch=196-step=44521.ckpt'
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', 
+        use_pretrained=False,use_existing=True)
+    return model
+
+def onexone_model():
+    model = trainAgg.OnexOneAggregationModule(use_pretrained=False, use_existing=True)
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_218/checkpoints/epoch=101-step=21215.ckpt', 
+        use_pretrained=False, use_existing=True)
+    return model
+
 if __name__ == '__main__':
 
     trainer = pl.Trainer()
@@ -33,8 +47,7 @@ if __name__ == '__main__':
     # we can also just take an index from the loaders but that takes forever
     train_loader, val_loader, test_loader = util.make_loaders()
 
-    model = trainAgg.End2EndAggregationModule(use_pretrained=False, use_existing= True)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', use_pretrained=False, use_existing = True)
+    model = onexone_model()
 
     trainer.test(model, test_loader)
 

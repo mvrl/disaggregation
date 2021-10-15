@@ -18,45 +18,35 @@ class regionAgg_layer(nn.Module):
     def __init__(self):
         super(regionAgg_layer, self).__init__()
 
-    def forward(self, x, parcel_mask_batch, use_existing=True):
+    def forward(self, x, parcel_mask_batch):
         #x: (b, h*w)
         #parcel_mask_batch: (b, num_parc, h*w)
-        if use_existing:
-            arr = []
-            for i, item in enumerate(parcel_mask_batch):
-                #item: (num_parc, h*w)
-                arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
-        else:
-            b = x.shape[0]
-            hw = x.shape[1]
-            block_masks = torch.block_diag(*[ torch.from_numpy(parcel_mask_batch[i]).to(x.device) for i in range(len(parcel_mask_batch)) ]).reshape(b, hw, -1)
-            arr = torch.bmm(x.unsqueeze(1), block_masks.float())
-        return arr
-
-class chip_value_sum(nn.Module):
-
-    def __init__(self):
-        super(chip_value_sum, self).__init__()
-
-    def forward(self, x, parcel_mask_batch):
         arr = []
         for i, item in enumerate(parcel_mask_batch):
             #item: (num_parc, h*w)
-            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
+            arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
+        return arr
+
+#class chip_value_sum(nn.Module):
+
+#    def __init__(self):
+#       super(chip_value_sum, self).__init__()
+
+#    def forward(self, x, parcel_mask_batch):
+#        arr = []
+#        for i, item in enumerate(parcel_mask_batch):
+#            #item: (num_parc, h*w)
+#            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
 
 
 '''
 Loss from the paper?
 '''
-def MSE(outputs, targets, use_existing=True):
-    if use_existing:
-        losses = []
-        for output,target in zip(outputs,targets):
-            losses.append( torch.sum((output - target)**2) ) 
-        loss = torch.stack(losses, dim=0).mean()
-    else:
-        block_parcel_values = torch.block_diag(*targets)
-        loss = torch.sum((outputs.squeeze() - block_parcel_values)**2, dim=1).mean()
+def MSE(outputs, targets):
+    losses = []
+    for output,target in zip(outputs,targets):
+        losses.append( torch.sum((output - target)**2) ) 
+    loss = torch.stack(losses, dim=0).mean()
     return loss
 
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
@@ -95,7 +85,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode):
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = test_collate,
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 

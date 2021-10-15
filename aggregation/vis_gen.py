@@ -8,6 +8,7 @@ from torchvision import transforms
 import numpy as np
 from tqdm import tqdm
 import pickle
+import seaborn as sns
 '''
     Generate Visualizations
 
@@ -53,8 +54,8 @@ def generate_pred_lists(model, dir_path):
 
     print("Computing all predicted values...")
     with torch.no_grad():
-        for sample in tqdm(train_loader):
-            image, mask, value = sample#, polygons, img_bbox = sample
+        for sample in tqdm(test_loader):
+            image, mask, value, polygons, img_bbox = sample
 
             estimated_values = model.pred_Out(image, mask)
 
@@ -75,7 +76,9 @@ def generate_scatter(experiment_name, model):
 
     est_pth = os.path.join(dir_path, 'estimated.txt')
     val_pth = os.path.join(dir_path, 'value.txt')
-    scatter_pth = os.path.join(dir_path, 'scatter')
+    scatter_pth = os.path.join(dir_path, 'scatter.png')
+    density_pth = os.path.join(dir_path, 'density.png')
+    error_pth = os.path.join(dir_path, 'error_hist.png')
 
     if not(os.path.exists(est_pth)):
         estimated_arr, value_arr = generate_pred_lists(model, dir_path)
@@ -92,13 +95,34 @@ def generate_scatter(experiment_name, model):
     plt.xlabel("True Value")
     plt.ylabel("Estimated Value")
     plt.savefig(scatter_pth)
+    plt.close()
+
+    plt.hist(value_arr, bins= 100)
+    plt.title("Test-set Distribution")
+    plt.xlabel("True Value")
+    plt.savefig(os.path.join(dir_path,"true_value_hist.png"))
+    plt.close()
+
+    ax = sns.kdeplot(x = value_arr, y = estimated_arr, clip = (0,1),
+     fill= True, thresh=0, levels =100,cmap="mako")
+    ax.set(xlabel = "True Values", ylabel = "Estimated Value", title= "Prediction Density Plot")
+    plt.savefig(density_pth)
+    plt.close()
+
+    errors = np.array(value_arr) - np.array(estimated_arr)
+    print("STD:",errors.std(), "MEAN:", errors.mean())
+    plt.hist(errors, bins = 1000)
+    plt.xlim(-2,2)
+    plt.xlabel("Raw Error")
+    plt.ylabel("Frequency")
+    plt.title("Error Distribution")
+    plt.savefig(error_pth)
+    plt.close()
 
 
 
 def generate_plot(image,vals, polygons, img_bbox, path):
     crop = transforms.CenterCrop((296,296))
-
-
 
     fig, axs = plt.subplots(3,1,figsize=(10,15))
     axs[0].imshow(crop( image.squeeze(0)).permute(1,2,0) )
@@ -138,7 +162,7 @@ def end2end_model():
 
 def onexone_model():
     model = trainAgg.OnexOneAggregationModule(use_pretrained=False, use_existing=True)
-    model = model.load_from_checkpoint('/u/eag-d1/data/Hennepin/model_checkpoints/UNet_pretrained1x1.ckpt', 
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_218/checkpoints/epoch=101-step=21215.ckpt', 
         use_pretrained=False, use_existing=True)
     return model
 
@@ -147,7 +171,7 @@ if __name__ == '__main__':
     model = end2end_model()
     #model = onexone_model()
 
-    experiment_name = 'testing_scatter_train'
+    experiment_name = 'testing_scatter'
 
     #generate_images('end2end_testing_noNORM', model, 100)
 

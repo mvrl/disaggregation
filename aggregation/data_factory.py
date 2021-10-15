@@ -55,23 +55,9 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
         print("Done")
 
-        # Some filtering is done in the dataset generation to save time. We want all patches with available masks...
-        print("Generating list of useful chips")
-        #self.rows = []
-        #for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
-        #    dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
-        #    masks_dir = os.path.join(dir_path, 'masks')
-        #    if(os.path.isdir(masks_dir)):
-        #        for filename in os.listdir(masks_dir):
-        #                if(filename.endswith('.tif')):
-
-   #             if os.listdir(masks_dir) != []:
-   #                     self.rows.append(row)
-                                
         #Un-used Currently
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
-
 
         print("Loading all values...")
         self.all_values = []
@@ -142,34 +128,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         row = self.all_rows[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
-        # Load in masks, build aggregation matrix
-        #masks_dir = os.path.join(dir_path, 'masks')
-
-        #masks = []
-        #values = []
-
-        # Lets gather paths and values from the gdf
-        #if(os.path.isdir(masks_dir)):
-        #    if os.listdir(masks_dir) != []:
-        #        for filename in os.listdir(masks_dir):
-        #            if(filename.endswith('.tif')):
-        #                # full file path
-        #                img_path = os.path.join(masks_dir, filename)
-        #
-        #                # Grab the PID filename
-        #                pid = os.path.splitext(filename)[0]
-        #                
-        #                # grab the value from the gdf
-        #                #value = self.gdf.loc[ self.gdf['PID'] == pid ]['TOTAL_MV1'].values.item()
-        #
-        #                # now we grab each mask
-        #                mask = Image.open(img_path)
-
-                        # each mask is generated upside down
-        #                        mask = transforms_function.vflip(mask)
-
-        #                masks.append(mask)
-        #               #values.append(value)
         masks = []
         for mask_path in self.all_mask_paths[idx]:
             # now we grab each mask
@@ -180,13 +138,10 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
             masks.append(mask)
 
-   
-        
         # image
         image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
         image = Image.open(image_name)
 
-        
         #Some code for generating the dasymetric maps
         #Grab the bounding box
         row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
@@ -200,17 +155,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             polygons = gpd.overlay(self.gdf, df2, how='intersection')
         else:
             polygons = 0
-    
-        #Then we need to generate a map of the parcels labeled with value
-        #dasy = generate_dasymetric_map(polygons, img_bbox)
-
-
-        # parcel value map
-        #parcel_fname = os.path.join(dir_path, 'parcel_value.tif')
-        #value_map = Image.open(parcel_fname)
-        #value_map = transforms_function.vflip(value_map)
-        #parcel_fname = os.path.join(dir_path, 'value.tif')
-
 
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:

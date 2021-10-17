@@ -24,10 +24,11 @@ cfg.data.root_dir = '/u/eag-d1/data/Hennepin/new_area/'
 cfg.train = edict()
 
 cfg.mode = 'train'
+cfg.uniform = False
 
 cfg.train.validation_split = 0.2         # percentage validation
 cfg.train.test_split = 0.2               # percentage test
-cfg.train.batch_size = 1
+cfg.train.batch_size = 16
 cfg.train.learning_rate = 5e-4           # initial learning rate
 cfg.train.l2_reg = 1e-6
 cfg.train.lr_decay = 0.9

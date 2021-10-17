@@ -27,6 +27,8 @@ class regionAgg_layer(nn.Module):
             arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
         return arr
 
+
+
 #class chip_value_sum(nn.Module):
 
 #    def __init__(self):
@@ -61,12 +63,12 @@ def MAE(outputs, targets):
 
     return torch.stack(losses, dim=0).mean()
 
-def make_dataset(mode):
-    this_dataset = data_factory.dataset_hennepin(mode, cfg.data.root_dir)
+def make_dataset(mode, uniform = False):
+    this_dataset = data_factory.dataset_hennepin(mode, cfg.data.root_dir, uniform)
     return this_dataset
 
-def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode):
-    this_dataset = make_dataset(mode)
+def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = cfg.uniform):
+    this_dataset = make_dataset(mode, uniform)
 
     torch.manual_seed(0)
 
@@ -79,13 +81,24 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode):
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+
+    if(uniform):
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle,
                             num_workers=cfg.train.num_workers)
 
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False,
                             num_workers=cfg.train.num_workers)
 
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                            num_workers=cfg.train.num_workers)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
+
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
+
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 

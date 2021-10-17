@@ -55,7 +55,7 @@ def generate_pred_lists(model, dir_path):
     print("Computing all predicted values...")
     with torch.no_grad():
         for sample in tqdm(test_loader):
-            image, mask, value, polygons, img_bbox = sample
+            image, mask, value = sample
 
             estimated_values = model.pred_Out(image, mask)
 
@@ -90,8 +90,8 @@ def generate_scatter(experiment_name, model):
 
     plt.scatter(value_arr,estimated_arr, s=0.2)
     plt.title("Prediction Scatter Plot")
-    plt.ylim(0,1)
-    plt.xlim(0,1)
+    plt.ylim(0,1000)
+    plt.xlim(0,1000)
     plt.xlabel("True Value")
     plt.ylabel("Estimated Value")
     plt.savefig(scatter_pth)
@@ -103,16 +103,16 @@ def generate_scatter(experiment_name, model):
     plt.savefig(os.path.join(dir_path,"true_value_hist.png"))
     plt.close()
 
-    ax = sns.kdeplot(x = value_arr, y = estimated_arr, clip = (0,1),
+    ax = sns.kdeplot(x = value_arr, y = estimated_arr, clip = (0,1000),
      fill= True, thresh=0, levels =100,cmap="mako")
     ax.set(xlabel = "True Values", ylabel = "Estimated Value", title= "Prediction Density Plot")
     plt.savefig(density_pth)
     plt.close()
 
-    errors = np.array(value_arr) - np.array(estimated_arr)
+    errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
     print("STD:",errors.std(), "MEAN:", errors.mean())
     plt.hist(errors, bins = 1000)
-    plt.xlim(-2,2)
+    #plt.xlim(-2,2)
     plt.xlabel("Raw Error")
     plt.ylabel("Frequency")
     plt.title("Error Distribution")
@@ -153,11 +153,14 @@ def plot_masks(image, masks):
 
 
 def end2end_model():
-    model = trainAgg.End2EndAggregationModule(use_pretrained=False, use_existing=True)
+    model = trainAgg.End2EndAggregationModule(use_pretrained=False)
     #'/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt' NEWEST
     # september '/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_206/checkpoints/epoch=196-step=44521.ckpt'
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', 
-        use_pretrained=False,use_existing=True)
+    # OCTOBER
+    #model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', 
+    #    use_pretrained=False,use_existing=True)
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_250/checkpoints/epoch=215-step=22463.ckpt', 
+        use_pretrained=False)
     return model
 
 def onexone_model():
@@ -171,7 +174,7 @@ if __name__ == '__main__':
     model = end2end_model()
     #model = onexone_model()
 
-    experiment_name = 'testing_scatter'
+    experiment_name = 'october_testing2'
 
     #generate_images('end2end_testing_noNORM', model, 100)
 

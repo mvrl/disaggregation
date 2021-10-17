@@ -17,10 +17,11 @@ import shapely
 from geofeather import to_geofeather, from_geofeather
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir):
+    def __init__(self, mode, data_dir, uniform):
         
         self.mode = mode
         self.data_dir = data_dir
+        self.uniform = uniform
 
         #handling paths
         csv_path = os.path.join(self.data_dir, 'hennepin_bbox.csv')
@@ -46,18 +47,20 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
 
         '''
-            NORMAlIZATION
+            Label Normalization
         '''
         #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         #Normalize data
-        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000 
+        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
         #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
         print("Done")
 
-        #Un-used Currently
-        self.to_tensor = transforms.ToTensor()
-        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # ImageNet
+        #Image Transformations
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.4712904,0.36086863,0.27999857], std=[0.24120754, 0.2294313, 0.21295355])
+        ])
 
         print("Loading all values...")
         self.all_values = []
@@ -159,43 +162,41 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         if self.mode == 'train':            # random flips during training
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
-                #value_map = transforms_function.hflip(value_map)
-
-                #Add loop for masks
                 masks = [transforms_function.hflip(mask) for mask in masks]
                 
             if random.random() > 0.5:
                 image = transforms_function.vflip(image)
-                #value_map = transforms_function.vflip(value_map)
-
-                #Add loop for masks
                 masks = [transforms_function.vflip(mask) for mask in masks]
 
-        # Random crop
-        #i, j, h, w = transforms.RandomCrop.get_params(image, output_size=(256, 256))
-        
-        #image = transforms_function.crop(image, i, j, h, w)
-        #value_map = transforms_function.crop(value_map, i, j, h, w)
-        #masks = [transforms_function.crop(mask, i, j, h, w) for mask in masks]
+        #Apply Transformation
+        image = self.transform(image)
 
-        image = self.to_tensor(image)
-        # note: no ImageNet normalization applied yet
-
-        #Prepare masks here
-        
-        #for each mask turn to numpy array, flatten, and vstack
-        masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
-
-        parcel_masks = np.vstack(masks)
         parcel_values = self.all_values[idx] #np.vstack(values)
-        
-        #value_map = torch.from_numpy(np.array(value_map))
+       
+        if(self.uniform):
+            uniform_value_map = np.zeros_like(masks[0])
+            total_parcel_mask = np.zeros_like(masks[0])
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                pixel_count = (mask == 1).sum()
+                uniform_value = parcel_values[i]/pixel_count
+                uniform_value_map = np.add(mask*uniform_value, uniform_value_map)
 
-        parcel_values = torch.from_numpy(parcel_values)
+            total_parcel_mask = (uniform_value_map > 0)
+            
+            sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
+                        'uniform_value_map': uniform_value_map}
+        else:
+            #for each mask turn to numpy array, flatten, and vstack
+            masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
+            parcel_masks = np.vstack(masks)
+            
 
-        sample = {'image': image,'parcel_masks': parcel_masks,
+            parcel_values = torch.from_numpy(parcel_values)
+            sample = {'image': image,'parcel_masks': parcel_masks,
                 'parcel_values':parcel_values,'polygons': polygons,
                 'img_bbox': img_bbox}
+
         return sample
 
 
@@ -204,3 +205,4 @@ def generate_dasymetric_map(polygons, img_bbox):
     polygons.plot(ax=ax, column = 'TOTAL_MV1', alpha = 1, linewidth=3)
     dasy = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     return dasy
+

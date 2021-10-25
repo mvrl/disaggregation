@@ -43,14 +43,19 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             to_geofeather(self.gdf, feather_path)
         self.shp_path = shp_path
 
-        # this will moreso be used for plotting
+        # We are going to use this instead of the value for getting outliers
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
 
         '''
             Label Normalization
         '''
+
+        # Watch for outliers
         #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
+        # We need to get the crazy area ones out of there
+        self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
+        
         #Normalize data
         self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
         #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
@@ -174,6 +179,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         parcel_values = self.all_values[idx] #np.vstack(values)
        
         if(self.uniform):
+            
             uniform_value_map = np.zeros_like(masks[0])
             total_parcel_mask = np.zeros_like(masks[0])
             for i,mask in enumerate(masks):

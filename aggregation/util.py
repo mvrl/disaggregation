@@ -28,19 +28,6 @@ class regionAgg_layer(nn.Module):
         return arr
 
 
-
-#class chip_value_sum(nn.Module):
-
-#    def __init__(self):
-#       super(chip_value_sum, self).__init__()
-
-#    def forward(self, x, parcel_mask_batch):
-#        arr = []
-#        for i, item in enumerate(parcel_mask_batch):
-#            #item: (num_parc, h*w)
-#            arr.append(torch.matmul(x[i], torch.from_numpy(item).T.float().to('cuda')))
-
-
 '''
 Loss from the paper?
 '''
@@ -72,7 +59,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = 
 
     torch.manual_seed(0)
 
-    train_size = int( np.round(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    train_size = int( np.floor(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
     val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
     test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
 
@@ -98,7 +85,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = 
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = test_collate,
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 

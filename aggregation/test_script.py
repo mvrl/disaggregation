@@ -1,5 +1,5 @@
 from numpy.core.numeric import indices
-import trainAgg
+import train
 import util
 from PIL import Image
 import torch

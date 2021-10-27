@@ -26,7 +26,7 @@ cfg.train = edict()
 
 cfg.mode = 'train'
 
-cfg.train.model = 'uniform'
+cfg.train.model = 'pretrained'
 cfg.train.validation_split = 0.2         # percentage validation
 cfg.train.test_split = 0.2               # percentage test
 cfg.train.batch_size = 16

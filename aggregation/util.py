@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
 from config import cfg
-import data_factory
+from datasets import hennepin
 import matplotlib.pyplot as plt
 
 # CIFAR code from original paper
@@ -51,7 +51,7 @@ def MAE(outputs, targets):
     return torch.stack(losses, dim=0).mean()
 
 def make_dataset(mode, uniform = False):
-    this_dataset = data_factory.dataset_hennepin(mode, cfg.data.root_dir, uniform)
+    this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, uniform)
     return this_dataset
 
 def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = cfg.uniform):

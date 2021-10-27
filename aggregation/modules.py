@@ -1,18 +1,10 @@
-# Requirements
-from numpy.lib.npyio import save
 import pytorch_lightning as pl
 import torch 
-
-#Local
-from models import unet
 import util
-from config import cfg
-
-# Testing, small imports
-from pytorch_lightning.callbacks import ModelCheckpoint
-import time
+from models import unet
 import torch.nn as nn
-    
+
+
 class RALModule(pl.LightningModule):
     def __init__(self,use_pretrained):
         super().__init__()
@@ -141,30 +133,3 @@ class UniformModule(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
-
-
-def chooseModel(model_name = cfg.train.model):
-    if model_name == "end2end":
-        model = RALModule(use_pretrained=False)
-    if model_name == "pretrained":
-        model = RALModule(use_pretrained=True)
-    if model_name == "uniform":
-        model = UniformModule(use_pretrained=True)
-        cfg.train.uniform = True
-    return model
-
-if __name__ == '__main__':
-    model = chooseModel()
-    train_loader, val_loader, test_loader = util.make_loaders(uniform=cfg.uniform)
-
-    #Init ModelCheckpoint callback, monitoring 'val_loss'
-
-    check_callback = ModelCheckpoint(monitor='val_loss', save_last=True, save_top_k=5, mode='min', filename='{epoch}-{val_loss:.2f}-{train_loss:.2f}')
-    ckpt_monitors = ()
-    trainer = pl.Trainer(gpus=cfg.train.device_ids, max_epochs = cfg.train.num_epochs, callbacks=[check_callback])
-    t0 = time.time()
-    trainer.fit(model, train_loader, val_loader)
-    t1 = time.time()
-    print('Training completed in', t1-t0, 'secs')
-    print('Training completed in',(t1-t0)/60, 'mins')
-    

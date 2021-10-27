@@ -1,8 +1,5 @@
 # disaggregation
 
-
-
-
 ## Hennepin Dataset
 Download Parcel Zipfile
 ```
@@ -20,4 +17,9 @@ Create Labels - Slow!
 cd dataset
 python generate_labels.py --path /u/eag-d1/data/Hennepin/ver1/ --gsd 1
 ```
-## Building Segmentation
+## Training
+To Train aggregation models:
+```/aggregation/train.py```
+
+Training controls in ```/aggregation/config.py```
+

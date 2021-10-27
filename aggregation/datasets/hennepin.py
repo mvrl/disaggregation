@@ -42,6 +42,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             self.gdf = gpd.read_file(shp_path)
             to_geofeather(self.gdf, feather_path)
         self.shp_path = shp_path
+        print("Done")
 
         # We are going to use this instead of the value for getting outliers
         self.gdf['AVERAGE_MV1'] = self.gdf['TOTAL_MV1'] / self.gdf['geometry'].area
@@ -49,17 +50,18 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         '''
             Label Normalization
         '''
-
         # Watch for outliers
-        #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
-        # We need to get the crazy area ones out of there
         self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
         
-        #Normalize data
+        #Min-Max
         self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
+        
+         # old clipping code
+        #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
+
+        #standardization
         #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - self.gdf['TOTAL_MV1'].mean()) / self.gdf['TOTAL_MV1'].std()
-        print("Done")
 
         #Image Transformations
         self.transform = transforms.Compose([
@@ -121,6 +123,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 pickle.dump(self.all_mask_paths, f)
             with open(paths_pickle_file, 'wb') as f:
                 pickle.dump(self.all_rows, f)
+
+        print("Done...")
         
     def __len__(self):
         return len(self.all_rows)
@@ -136,6 +140,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         row = self.all_rows[idx]
         dir_path = os.path.join(self.data_dir, str(int(row['lat_mid'])), str(int(row['lon_mid'])))
 
+        # *** Maybe it makes sense to do this in initialization ***
         masks = []
         for mask_path in self.all_mask_paths[idx]:
             # now we grab each mask

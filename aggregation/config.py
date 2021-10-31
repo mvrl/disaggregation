@@ -19,18 +19,20 @@ cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
 cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
 cfg.data.root_dir = '/u/eag-d1/data/Hennepin/new_area/'
-cfg.uniform = False
-
+cfg.data.sample_mode = 'agg'
+# 289 is training for agg
 
 cfg.train = edict()
-
 cfg.mode = 'train'
 
-cfg.train.model = 'pretrained'
+cfg.experiment_name = 'uniform'
+
+
+cfg.train.model = 'uniform'
 cfg.train.validation_split = 0.2         # percentage validation
 cfg.train.test_split = 0.2               # percentage test
 cfg.train.batch_size = 16
 cfg.train.shuffle = True                 # shuffle training samples
 cfg.train.num_epochs = 300                # number of training epochs  ...
 cfg.train.num_workers = 8                # workers for data loading
-cfg.train.device_ids = [1]                 # Train on two GPUs? Set True for blackbird
+cfg.train.device_ids = [0]                 # Train on two GPUs? Set True for blackbird

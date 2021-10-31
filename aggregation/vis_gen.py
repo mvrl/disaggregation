@@ -15,6 +15,10 @@ from config import cfg
 
     TBD:    -generate batch-wise visualizations
             -move arbitrary paths to config.
+
+
+    set a config setup for saving models, saving results, saving visualizations, 
+    lightning_logs?, be able to tensorboard all of them?
 '''
 
 # This is a py script of the original jupyter notebook
@@ -24,10 +28,6 @@ from config import cfg
 def generate_images(experiment_name, model, num_images):
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'test')
 
-    #test_loader.batch_size = 1
-    #this_dataset.mode = 'test'
-    #print(test_loader)
-
     dir_path= os.path.join( os.getcwd(),'visualizations/',experiment_name )
     os.makedirs(dir_path, exist_ok=True)
     c = 0
@@ -35,7 +35,6 @@ def generate_images(experiment_name, model, num_images):
         for sample in test_loader:
             image, masks, value, polygons, img_bbox = sample
 
-            
             value = value[0]
 
             vals = model.get_valOut(image)
@@ -53,43 +52,14 @@ def generate_images(experiment_name, model, num_images):
                 uniform_value = uniform_value.cpu().detach().numpy()
                 uniform_value_map = np.add(mask*uniform_value, uniform_value_map)
             
-
             uniform_value_map = uniform_value_map.reshape(cfg.data.cutout_size)
 
             path =  os.path.join(dir_path, str(c) )
-            print(path)
-            print(c)
 
             generate_plot(image.squeeze(0),vals.squeeze(0),uniform_value_map,polygons,img_bbox, path)
             c+=1
             if c >= num_images:
                 return
-
-def generate_pred_lists(model, dir_path):
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'test')
-
-    est_pth = os.path.join(dir_path, 'estimated.txt')
-    val_pth = os.path.join(dir_path, 'value.txt')
-    
-    estimated_arr = []
-    value_arr = []
-
-    print("Computing all predicted values...")
-    with torch.no_grad():
-        for sample in tqdm(test_loader):
-            image, mask, value = sample
-
-            estimated_values = model.pred_Out(image, mask)
-
-            estimated_arr.extend( estimated_values[0].cpu().numpy().tolist())
-            value_arr.extend(value[0].numpy().tolist())
-
-    with open(est_pth, "wb") as fp:   #Pickling
-        pickle.dump(estimated_arr, fp)
-    with open(val_pth, "wb") as fp:   #Pickling
-        pickle.dump(value_arr, fp)
-
-    return estimated_arr, value_arr
 
 def generate_scatter(experiment_name, model):
     dir_path= os.path.join( os.getcwd(),'visualizations/',experiment_name)
@@ -201,15 +171,14 @@ def end2end_model():
     # OCTOBER
     #model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', 
     #    use_pretrained=False,use_existing=True)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_276/checkpoints/epoch=120-val_loss=3327.04-train_loss=2201.34.ckpt', 
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_282/checkpoints/epoch=93-val_loss=3222.87-train_loss=2671.26.ckpt', 
         use_pretrained=False)
     return model
 
-def onexone_model():
-    model = trainAgg.OnexOneAggregationModule(use_pretrained=False)
-    #model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_218/checkpoints/epoch=101-step=21215.ckpt', 
-    #    use_pretrained=False, use_existing=True)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_251/checkpoints/epoch=164-step=17159.ckpt', 
+
+def pretrained_model():
+    model = trainAgg.RALModule(use_pretrained=False)
+    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_281/checkpoints/epoch=101-val_loss=2997.48-train_loss=1768.24.ckpt', 
         use_pretrained=False)
     return model
 

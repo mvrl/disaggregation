@@ -1,7 +1,8 @@
 outputs
-models
 splitfiles
 __pycache__
 lightning_logs
 visualizations/*/*
 py36.yml
+results
+notebooks

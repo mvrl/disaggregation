@@ -7,7 +7,7 @@ from config import cfg
 from datasets import hennepin
 import matplotlib.pyplot as plt
 
-# CIFAR code from original paper
+# CIFAR code from original paperß
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
 
 ''' 
@@ -27,10 +27,7 @@ class regionAgg_layer(nn.Module):
             arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
         return arr
 
-
-'''
-Loss from the paper?
-'''
+'''Loss from the paper?'''
 def MSE(outputs, targets):
     losses = []
     for output,target in zip(outputs,targets):
@@ -38,27 +35,23 @@ def MSE(outputs, targets):
     loss = torch.stack(losses, dim=0).mean()
     return loss
 
-# https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
-
-
 def MAE(outputs, targets):
     losses = []
-
     for output, target in zip(outputs,targets):
         error = output-target
         losses.append(torch.sum(torch.abs(error.cpu())))
 
     return torch.stack(losses, dim=0).mean()
 
-def make_dataset(mode, uniform = False):
-    this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, uniform)
+def make_dataset(mode, sample_mode = ''):
+    this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, sample_mode)
     return this_dataset
 
-def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = cfg.uniform):
-    this_dataset = make_dataset(mode, uniform)
+def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.sample_mode):
+    this_dataset = make_dataset(mode, sample_mode)
 
     torch.manual_seed(0)
-
+    
     train_size = int( np.floor(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
     val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
     test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
@@ -69,7 +62,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
 
-    if(uniform):
+    if(sample_mode == 'uniform' or sample_mode =='agg'):
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle,
                             num_workers=cfg.train.num_workers)
 
@@ -85,7 +78,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, uniform = 
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = test_collate,
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 
@@ -119,22 +112,4 @@ def test_collate(batch):
     img_bbox = [item['img_bbox'] for item in batch]
 
     return image, mask, value, polygons, img_bbox
-
-
-#Uses torch_grid to make gridded images of batches, not great scaling
-def get_grids(model, data_loader):
-    with torch.no_grad():
-        for batch in data_loader:
-            x, mask, value = batch
-    
-            values = model.get_valOut(x)
-            seg = model.cnnOutput(x)
-
-            image_grid = t_util.make_grid(x)
-            value_grid = t_util.make_grid(values)
-            seg_grid = t_util.make_grid(seg)
-
-            return image_grid, seg_grid, value_grid
-
-   
 

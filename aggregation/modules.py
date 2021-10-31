@@ -133,3 +133,64 @@ class UniformModule(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
+
+class AggregatedModule(pl.LightningModule):
+    def __init__(self,use_pretrained):
+        super().__init__()
+        self.unet = unet.UNet(in_channels=3, out_channels=1)
+
+        # This wont work, since the pretrained unet has 2 output channels
+        if(use_pretrained):
+            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
+
+            model_state = self.unet.state_dict()
+            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
+            model_state.update(pretrained_state)
+            self.unet.load_state_dict(model_state)
+
+        self.loss = nn.L1Loss()
+        self.agg = util.regionAgg_layer()
+
+    def forward(self, x):
+        x = self.unet(x)
+        return x
+
+    def cnnOutput(self, x):
+        x = self.unet(x)
+        return x
+
+    def get_valOut(self, x):
+        x = self.unet(x)
+        return x
+
+    def pred_Out(self, x, masks):
+        output = self(x)
+        output = torch.flatten(output, start_dim=1)
+        estimated_values = self.agg(output, masks)
+        return estimated_values
+
+    def shared_step(self, batch):
+        output = self(batch['image']).squeeze(1)
+        output = torch.mul(output,batch['total_parcel_mask'])
+        output = torch.sum(output, dim =(1,2))
+        loss = self.loss(output,batch['parcel_values_sum'])
+        return {'loss': loss}
+
+    def training_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('train_loss', output['loss'], on_epoch = True)
+        return output['loss']
+
+    def validation_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('val_loss', output['loss'], on_epoch = True)
+        return output['loss']
+
+    def test_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('test_loss', output['loss'], on_epoch = True)
+        return output['loss']
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer

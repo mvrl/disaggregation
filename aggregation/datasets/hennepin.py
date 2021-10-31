@@ -17,11 +17,11 @@ import shapely
 from geofeather import to_geofeather, from_geofeather
 
 class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
-    def __init__(self, mode, data_dir, uniform):
+    def __init__(self, mode, data_dir, sample_mode):
         
         self.mode = mode
         self.data_dir = data_dir
-        self.uniform = uniform
+        self.sample_mode = sample_mode
 
         #handling paths
         csv_path = os.path.join(self.data_dir, 'hennepin_bbox.csv')
@@ -57,7 +57,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         #Min-Max
         self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
         
-         # old clipping code
+        # old clipping code
         #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))
 
         #standardization
@@ -68,7 +68,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.4712904,0.36086863,0.27999857], std=[0.24120754, 0.2294313, 0.21295355])
         ])
-
+        
         print("Loading all values...")
         self.all_values = []
         self.all_mask_paths = []
@@ -170,6 +170,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             polygons = 0
 
         if self.mode == 'train':            # random flips during training
+
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
                 masks = [transforms_function.hflip(mask) for mask in masks]
@@ -183,8 +184,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
         parcel_values = self.all_values[idx] #np.vstack(values)
        
-        if(self.uniform):
-            
+        if(self.sample_mode == 'uniform'):
             uniform_value_map = np.zeros_like(masks[0])
             total_parcel_mask = np.zeros_like(masks[0])
             for i,mask in enumerate(masks):
@@ -197,6 +197,16 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'uniform_value_map': uniform_value_map}
+        elif(self.sample_mode == 'agg'):
+            total_parcel_mask = np.zeros_like(masks[0])
+            parcel_values_sum = 0
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                parcel_values_sum += parcel_values[i]
+                total_parcel_mask = np.add(mask, total_parcel_mask)
+            total_parcel_mask = (total_parcel_mask > 0)
+            sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
+                        'parcel_values_sum': parcel_values_sum}
         else:
             #for each mask turn to numpy array, flatten, and vstack
             masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]

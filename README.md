@@ -23,3 +23,11 @@ To Train aggregation models:
 
 Training controls in ```/aggregation/config.py```
 
+Generate visualizations/test statistics ```/aggregation/vis_gen.py``` (model selection in main)
+
+WIP Testing script```/aggregation/test_script.py``` (model selection in main)
+
+# TODO
+    Configure models for various CNN architectures.(ResNet50)
+    Probabalistic disaggregation
+    Get rid of custom Collate, speed up training

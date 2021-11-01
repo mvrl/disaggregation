@@ -1,6 +1,10 @@
 # disaggregation
 
 ## Hennepin Dataset
+/dataset/
+This is for dowloading, organizing, and writing the hennepin dataset, 
+configuration found within the script files
+
 Download Parcel Zipfile
 ```
 cd dataset
@@ -18,7 +22,7 @@ cd dataset
 python generate_labels.py --path /u/eag-d1/data/Hennepin/ver1/ --gsd 1
 ```
 ## Training
-To Train aggregation models:
+To train region aggregation models:
 ```/aggregation/train.py```
 
 Training controls in ```/aggregation/config.py```

@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 import util
-import trainAgg
-import data_factory
 import torch
 import os
 from torchvision import transforms
@@ -10,6 +8,7 @@ from tqdm import tqdm
 import pickle
 import seaborn as sns
 from config import cfg
+import test
 '''
     Generate Visualizations
 
@@ -25,11 +24,9 @@ from config import cfg
 # It will save all the generated visualizations to /outputs
 # Come up with some naming scheme
 
-def generate_images(experiment_name, model, num_images):
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'test')
+def generate_images(model, num_images, dir_path):
+    train_loader, val_loader, test_loader = util.make_vis_loaders(batch_size = 1, mode = 'test', sample_mode='')
 
-    dir_path= os.path.join( os.getcwd(),'visualizations/',experiment_name )
-    os.makedirs(dir_path, exist_ok=True)
     c = 0
     with torch.no_grad():
         for sample in test_loader:
@@ -61,10 +58,7 @@ def generate_images(experiment_name, model, num_images):
             if c >= num_images:
                 return
 
-def generate_scatter(experiment_name, model):
-    dir_path= os.path.join( os.getcwd(),'visualizations/',experiment_name)
-    if not(os.path.exists(dir_path)):
-        os.mkdir(dir_path)
+def generate_scatter(model, dir_path):
 
     est_pth = os.path.join(dir_path, 'estimated.txt')
     val_pth = os.path.join(dir_path, 'value.txt')
@@ -73,13 +67,10 @@ def generate_scatter(experiment_name, model):
     mae_error_pth = os.path.join(dir_path, 'mae_error_hist.png')
     mse_error_pth = os.path.join(dir_path, 'mse_error_hist.png')
 
-    if not(os.path.exists(est_pth)):
-        estimated_arr, value_arr = generate_pred_lists(model, dir_path)
-    else:
-        with open(est_pth, "rb") as fp:
-            estimated_arr = pickle.load(fp)
-        with open(val_pth, "rb") as fp:
-            value_arr = pickle.load(fp)
+    with open(est_pth, "rb") as fp:
+        estimated_arr = pickle.load(fp)
+    with open(val_pth, "rb") as fp:
+        value_arr = pickle.load(fp)
 
     plt.scatter(value_arr,estimated_arr, s=0.2)
     plt.title("Prediction Scatter Plot")
@@ -128,8 +119,6 @@ def generate_scatter(experiment_name, model):
 
 
 def generate_plot(image,vals, uniform_value_map, polygons, img_bbox, path):
-    #crop = transforms.CenterCrop((296,296))
-
     fig, axs = plt.subplots(4,1,figsize=(10,15))
     axs[0].imshow(image.permute(1,2,0) )
     axs[0].axis('off')
@@ -152,50 +141,17 @@ def generate_plot(image,vals, uniform_value_map, polygons, img_bbox, path):
     plt.savefig(path)
     plt.close(fig)
 
-# Thinking about plotting the masks potentially. 
-def plot_masks(image, masks):
-    fig,axs = plt.subplots(1,len(masks)+1, figsize = (15,5))
-    axs[0].imshow(image.squeeze(0).permute(1,2,0))
-    axs[0].axis('off')
-    axs[0].set_title("Image")
 
-    for x in range(1, len(masks)+1):
-        axs[x].plot()
-
-
-
-def end2end_model():
-    model = trainAgg.RALModule(use_pretrained=False)
-    #'/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt' NEWEST
-    # september '/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_206/checkpoints/epoch=196-step=44521.ckpt'
-    # OCTOBER
-    #model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_215/checkpoints/epoch=124-step=25999.ckpt', 
-    #    use_pretrained=False,use_existing=True)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_282/checkpoints/epoch=93-val_loss=3222.87-train_loss=2671.26.ckpt', 
-        use_pretrained=False)
-    return model
-
-
-def pretrained_model():
-    model = trainAgg.RALModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_281/checkpoints/epoch=101-val_loss=2997.48-train_loss=1768.24.ckpt', 
-        use_pretrained=False)
-    return model
-
-def uniform_model():
-    model = trainAgg.UniformModule(use_pretrained=False)
-    model = model.load_from_checkpoint('/u/pop-d1/grad/cgar222/Projects/disaggregation/aggregation/lightning_logs/version_277/checkpoints/epoch=214-val_loss=0.04-train_loss=0.01.ckpt', 
-        use_pretrained=False)
-    return model
 
 if __name__ == '__main__':
+    dir_path = os.path.join(os.getcwd(), 'results', cfg.experiment_name)
+    vis_path= os.path.join(dir_path ,'visualizations/')
+    ckpt_path = os.path.join(dir_path,'best.ckpt')
+    if not(os.path.exists(vis_path)):
+        os.mkdir(vis_path)
 
-    model = end2end_model()
-    #model = onexone_model()
-    #model = uniform_model()
+    model = test.loadModel(ckpt_path , cfg.train.model)
 
-    experiment_name = 'october_vis_agg'
+    generate_scatter(model, dir_path)
 
-    generate_images(experiment_name, model, 100)
-
-    #generate_scatter(experiment_name, model)
+    generate_images(model, 200, vis_path)

@@ -52,15 +52,13 @@ def generate_pred_lists(model, dir_path):
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
     mse_errors = np.array(value_arr) - np.array(estimated_arr)
     mse_errors = np.power(mse_errors,2)
-    per_chip_error = np.array(per_chip_errors).mean()
+    per_chip_error = np.abs(np.array(per_chip_errors)).mean()
 
     return mae_errors.mean(), mse_errors.mean(), per_chip_error
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
-    if model_name == "end2end":
+    if model_name == "ral":
         model = modules.RALModule(use_pretrained=False)
-    if model_name == "pretrained":
-        model = modules.RALModule(use_pretrained=False) # this can be a config setting
     if model_name == "uniform":
         model = modules.UniformModule(use_pretrained=False)
         cfg.data.sample_mode = 'uniform'

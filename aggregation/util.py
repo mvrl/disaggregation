@@ -86,6 +86,34 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
 
     return train_loader, val_loader, test_loader
 
+def make_vis_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.sample_mode):
+    this_dataset = make_dataset(mode, sample_mode)
+
+    torch.manual_seed(0)
+    
+    train_size = int( np.floor(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
+    val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
+    test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
+
+
+    print(len(this_dataset), len(this_dataset)*0.6, len(this_dataset)*0.2, test_size)
+
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
+
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
+                            num_workers=cfg.train.num_workers)
+
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = vis_collate,
+                            num_workers=cfg.train.num_workers)
+
+    # set the random seed back 
+    torch.random.seed()
+
+    return train_loader, val_loader, test_loader
+
 # Minibatch creation for variable size targets in Hennepin Dataset
 def my_collate(batch):
 
@@ -99,7 +127,7 @@ def my_collate(batch):
     return image, mask, value
 
 # Minibatch creation for variable size targets in Hennepin Dataset
-def test_collate(batch):
+def vis_collate(batch):
 
     #Masks and values are in lists        
     mask = [item['parcel_masks'] for item in batch]

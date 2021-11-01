@@ -40,7 +40,6 @@ class RALModule(pl.LightningModule):
 
     def pred_Out(self, x, masks):
          output = self(x)
-         print(output.shape)
          estimated_values = self.agg(output, masks)
          return estimated_values
 

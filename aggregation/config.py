@@ -19,13 +19,13 @@ cfg.data.name = 'hennepin'               # only 'hennepin' for now
 
 cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
 cfg.data.root_dir = '/u/eag-d1/data/Hennepin/new_area/'
-cfg.data.sample_mode = 'uniform'
+cfg.data.sample_mode = 'uniform_agg'
 
 
 cfg.train = edict()
 cfg.mode = 'train'
 
-cfg.experiment_name = 'uniform_notpre'
+cfg.experiment_name = 'uniform_agg'
 
 cfg.train.use_pretrained = False
 cfg.train.model = 'uniform'

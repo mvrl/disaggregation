@@ -16,10 +16,11 @@ def chooseModel(model_name = cfg.train.model):
         model = modules.RALModule(use_pretrained=cfg.train.use_pretrained)
     if model_name == "uniform":
         model = modules.UniformModule(use_pretrained=cfg.train.use_pretrained)
-        cfg.data.sample_mode = 'uniform'
-    if(model_name == 'agg'):
-        model = modules.AggregatedModule(use_pretrained=cfg.train.use_pretrained)
-        cfg.data.sample_mode ='agg'
+        #cfg.data.sample_mode = 'uniform'
+    if(model_name == 'prob'):
+        model = modules.ProbabalisticModule(use_pretrained=cfg.train.use_pretrained)
+    if(model_name == 'gauss'):
+        model = modules.GaussModule(use_pretrained=cfg.train.use_pretrained)
     return model
 
 if __name__ == '__main__':

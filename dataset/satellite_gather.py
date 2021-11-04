@@ -41,7 +41,7 @@ def download(item):
 if __name__ == "__main__":
 
   #image size in meters
-  image_width = 302 * int(args.gsd)
+  image_width = 604 * int(args.gsd)
   delta_X = image_width / 2
 
   #ESPG:26915 - meters
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     #utils.ensure_dir(naip_dir)
 
     #template_url = 'http://kyraster.ky.gov/arcgis/services/ImageServices/Ky_NAIP_2014_1M/ImageServer/WMSServer?request=GetMap&service=WMS&layers=0&CRS=EPSG:4326&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tif'
-    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=302&height=302&format=image/tiff'
+    template_url = 'https://gis.hennepin.us/arcgis/services/Imagery/UTM_Aerial_2020/MapServer/WMSServer?version=1.3.0&&service=WMS&request=GetMap&&styles=&layers=0&CRS=EPSG:26915&BBOX={:},{:},{:},{:}&width=604&height=604&format=image/tiff'
 
     print('Preparing jobs')
 

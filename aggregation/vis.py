@@ -25,7 +25,7 @@ import test
 # Come up with some naming scheme
 
 def generate_images(model, num_images, dir_path):
-    train_loader, val_loader, test_loader = util.make_vis_loaders(batch_size = 1, mode = 'test', sample_mode='')
+    train_loader, val_loader, test_loader = util.make_vis_loaders(batch_size = 1, mode = 'vis', sample_mode='')
 
     c = 0
     with torch.no_grad():
@@ -41,27 +41,37 @@ def generate_images(model, num_images, dir_path):
             # CRATING AVERAGE VALUE MASK COMBINATION
             masks = masks[0]
             estimated_values = estimated_values[0]
-            uniform_value_map = np.zeros_like(masks[0])
+            pred_map = np.zeros_like(masks[0])
             for i,mask in enumerate(masks):
                 mask = np.array(mask)
                 pixel_count = (mask == 1).sum()
                 uniform_value = estimated_values[i]/pixel_count
                 uniform_value = uniform_value.cpu().detach().numpy()
-                uniform_value_map = np.add(mask*uniform_value, uniform_value_map)
+                pred_map = np.add(mask*uniform_value, pred_map)
             
-            uniform_value_map = uniform_value_map.reshape(cfg.data.cutout_size)
+            pred_map = pred_map.reshape(cfg.data.cutout_size)
+
+            true_map = np.zeros_like(masks[0])
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                pixel_count = (mask == 1).sum()
+                uniform_value = value[i]/pixel_count
+                uniform_value = uniform_value.cpu().detach().numpy()
+                true_map = np.add(mask*uniform_value, true_map)
+            
+            true_map = true_map.reshape(cfg.data.cutout_size)
 
             path =  os.path.join(dir_path, str(c) )
 
-            generate_plot(image.squeeze(0),vals.squeeze(0),uniform_value_map,polygons,img_bbox, path)
+            generate_plot(image.squeeze(0),vals.squeeze(0),pred_map,true_map, path)
             c+=1
             if c >= num_images:
                 return
 
 def generate_scatter(model, dir_path):
 
-    est_pth = os.path.join(dir_path, 'estimated.txt')
-    val_pth = os.path.join(dir_path, 'value.txt')
+    est_pth = os.path.join(dir_path, 'estimated.pkl')
+    val_pth = os.path.join(dir_path, 'value.pkl')
     scatter_pth = os.path.join(dir_path, 'scatter.png')
     density_pth = os.path.join(dir_path, 'density.png')
     mae_error_pth = os.path.join(dir_path, 'mae_error_hist.png')
@@ -118,26 +128,26 @@ def generate_scatter(model, dir_path):
 
 
 
-def generate_plot(image,vals, uniform_value_map, polygons, img_bbox, path):
-    fig, axs = plt.subplots(4,1,figsize=(10,15))
-    axs[0].imshow(image.permute(1,2,0) )
-    axs[0].axis('off')
-    axs[0].set_title("Image")
-    axs[1].imshow(vals.permute(1,2,0) , cmap = 'Greens')
-    axs[1].axis('off')
-    axs[1].set_title("Value Map")
+def generate_plot(image,vals, pred_map, true_map, path):
+    fig, axs = plt.subplots(2,2,figsize=(10,10))
+    axs[0][0].imshow(image.permute(1,2,0) )
+    axs[0][0].axis('off')
+    axs[0][0].set_title("Image")
+    print(vals.shape)
+    axs[0][1].imshow(vals.permute(1,2,0) , cmap = 'Greens')
+    axs[0][1].axis('off')
+    axs[0][1].set_title("Value Prediction")
     
     # CRATING AVERAGE VALUE MASK COMBINATION
-    axs[2].imshow(uniform_value_map, cmap = 'Greens')
-    axs[2].axis('off')
-    axs[2].set_title("Value by Parcel Sum")
+    axs[1][1].imshow(pred_map, cmap = 'Greens')
+    axs[1][1].axis('off')
+    axs[1][1].set_title("Aggregated Value Prediction")
 
     # This needs proper color scalings... unsure how to do this
-    polygons[0].plot(ax=axs[3], column = 'AVERAGE_MV1', alpha = 0.95, linewidth=5, cmap = 'Greens')
-    axs[3].imshow(image.squeeze(0).permute(1,2,0), extent = img_bbox[0], origin = 'upper', alpha= 0.3)
-    axs[3].set_title("True Value Map")
-    axs[3].axis('off')
-    fig.tight_layout()
+    axs[1][0].imshow(true_map, cmap = 'Greens')
+    axs[1][0].set_title("True Value Map")
+    axs[1][0].axis('off')
+    fig.tight_layout(pad=1)
     plt.savefig(path)
     plt.close(fig)
 
@@ -154,4 +164,4 @@ if __name__ == '__main__':
 
     generate_scatter(model, dir_path)
 
-    generate_images(model, 200, vis_path)
+    generate_images(model, 100, vis_path)

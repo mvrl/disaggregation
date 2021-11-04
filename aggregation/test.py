@@ -18,7 +18,7 @@ def generate_pred_lists(model, dir_path):
     pc_pth = os.path.join(dir_path, 'perchip.pkl')
 
     if (os.path.exists(est_pth)):
-        with open(est_pth, "rb") as fp:
+        with open(est_pth, "rb") as fp:\
             estimated_arr = pickle.load(fp)
         with open(val_pth, "rb") as fp:
             value_arr = pickle.load(fp)
@@ -62,9 +62,10 @@ def loadModel(ckpt_path, model_name = cfg.train.model):
     if model_name == "uniform":
         model = modules.UniformModule(use_pretrained=False)
         cfg.data.sample_mode = 'uniform'
-    if(model_name == 'agg'):
-        model = modules.AggregatedModule(use_pretrained=False)
-        cfg.data.sample_mode ='agg'
+    if(model_name == 'prob'):
+        model = modules.ProbabalisticModule(use_pretrained=False)
+    if(model_name == 'gauss'):
+        model = modules.GaussModule(use_pretrained=False)
 
     model = model.load_from_checkpoint(ckpt_path, 
         use_pretrained=False)

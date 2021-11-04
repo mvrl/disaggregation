@@ -68,6 +68,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.4712904,0.36086863,0.27999857], std=[0.24120754, 0.2294313, 0.21295355])
         ])
+
+        self.to_tensor = transforms.ToTensor()
         
         print("Loading all values...")
         self.all_values = []
@@ -161,7 +163,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
 
         # We should only do this during testing since it really slows things down?
-        if(self.mode == 'test'):
+        if(self.mode == 'vis'):
             bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
             df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
             df2.crs = "EPSG:26915"
@@ -179,8 +181,11 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 image = transforms_function.vflip(image)
                 masks = [transforms_function.vflip(mask) for mask in masks]
 
-        #Apply Transformation
-        image = self.transform(image)
+        if self.mode != 'vis':
+            #Apply Transformation
+            image = self.transform(image)
+        else:
+            image = self.to_tensor(image)
 
         parcel_values = self.all_values[idx] #np.vstack(values)
        
@@ -207,11 +212,28 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             total_parcel_mask = (total_parcel_mask > 0)
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'parcel_values_sum': parcel_values_sum}
+        elif(self.sample_mode == 'uniform_agg'):
+            uniform_value_map = np.zeros_like(masks[0])
+            total_parcel_mask = np.zeros_like(masks[0])
+            pixel_count_sum = 0
+            parcel_values_sum = 0
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                pixel_count = (mask == 1).sum()
+                pixel_count_sum += pixel_count
+                parcel_values_sum += parcel_values[i]
+                total_parcel_mask = np.add(mask, total_parcel_mask)
+            total_parcel_mask = (total_parcel_mask > 0)
+            uniform_value = parcel_values_sum/pixel_count_sum
+            uniform_value_map = np.add(mask*uniform_value, total_parcel_mask)
+
+            total_parcel_mask = (uniform_value_map > 0)
+            sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
+                        'uniform_value_map': uniform_value_map}
         else:
             #for each mask turn to numpy array, flatten, and vstack
             masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
             parcel_masks = np.vstack(masks)
-            
 
             parcel_values = torch.from_numpy(parcel_values)
             sample = {'image': image,'parcel_masks': parcel_masks,

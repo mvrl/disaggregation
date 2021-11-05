@@ -164,7 +164,6 @@ class ProbabalisticModule(pl.LightningModule):
 
     def pred_Out(self, x, masks):
         means, stds = self(x)
-        print(stds)
         output = torch.flatten(means, start_dim=1)
         estimated_values = self.agg(output, masks)
         return estimated_values

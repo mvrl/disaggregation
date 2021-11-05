@@ -21,11 +21,12 @@ cfg.data.cutout_size = (302, 302)        # final image size. Not implemented yet
 cfg.data.root_dir = '/u/eag-d1/data/Hennepin/new_area/'
 cfg.data.sample_mode = ''
 
-cfg.experiment_name = 'new_experiment'
-cfg.model = 'ral'
+cfg.experiment_name = 'prob_1'
+
 
 cfg.train = edict()
 cfg.mode = 'train'
+cfg.train.model = 'prob'
 
 cfg.train.use_pretrained = False
 

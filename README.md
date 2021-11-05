@@ -18,7 +18,7 @@ Testing script```/aggregation/test.py```
 Be sure to set the config for these when running a new experiment:
 ```cfg.data.sample_mode = ''``` certian models require a different sample mode for the dataset. In general leave blank.
 ```cfg.experiment_name = 'experiment_name_goes_here'```
-```cfg.model = 'model_name' ```
+```cfg.train.model = 'model_name' ```
 ```cfg.train.use_pretrained = Boolean```
 model selects a module in modules.py.
 

@@ -57,8 +57,8 @@ def generate_pred_lists(model, dir_path):
 
     return mae_errors.mean(), mse_errors.mean(), per_chip_error
 
-def loadModel(ckpt_path, model_name = cfg.model):
-    train.chooseModel(model_name)
+def loadModel(ckpt_path, model_name = cfg.train.model):
+    model =train.chooseModel(model_name)
 
     model = model.load_from_checkpoint(ckpt_path, 
         use_pretrained=False)

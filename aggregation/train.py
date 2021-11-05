@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import time
 
 
-def chooseModel(model_name = cfg.model):
+def chooseModel(model_name = cfg.train.model):
     if model_name == "ral":
         model = modules.RALModule(use_pretrained=cfg.train.use_pretrained)
     if model_name == "uniform":

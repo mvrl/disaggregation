@@ -7,6 +7,7 @@ from tqdm import tqdm
 from config import cfg
 import modules
 import numpy as np
+import train
 # This script is for getting some test metrics for MAE or MSE on the parcel value estimation
 
 # Move this to a bonafide testing script
@@ -56,16 +57,8 @@ def generate_pred_lists(model, dir_path):
 
     return mae_errors.mean(), mse_errors.mean(), per_chip_error
 
-def loadModel(ckpt_path, model_name = cfg.train.model):
-    if model_name == "ral":
-        model = modules.RALModule(use_pretrained=False)
-    if model_name == "uniform":
-        model = modules.UniformModule(use_pretrained=False)
-        cfg.data.sample_mode = 'uniform'
-    if(model_name == 'prob'):
-        model = modules.ProbabalisticModule(use_pretrained=False)
-    if(model_name == 'gauss'):
-        model = modules.GaussModule(use_pretrained=False)
+def loadModel(ckpt_path, model_name = cfg.model):
+    train.chooseModel(model_name)
 
     model = model.load_from_checkpoint(ckpt_path, 
         use_pretrained=False)

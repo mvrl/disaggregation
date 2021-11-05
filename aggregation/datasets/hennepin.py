@@ -202,16 +202,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'uniform_value_map': uniform_value_map}
-        elif(self.sample_mode == 'agg'):
-            total_parcel_mask = np.zeros_like(masks[0])
-            parcel_values_sum = 0
-            for i,mask in enumerate(masks):
-                mask = np.array(mask)
-                parcel_values_sum += parcel_values[i]
-                total_parcel_mask = np.add(mask, total_parcel_mask)
-            total_parcel_mask = (total_parcel_mask > 0)
-            sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
-                        'parcel_values_sum': parcel_values_sum}
         elif(self.sample_mode == 'uniform_agg'):
             uniform_value_map = np.zeros_like(masks[0])
             total_parcel_mask = np.zeros_like(masks[0])
@@ -225,11 +215,26 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 total_parcel_mask = np.add(mask, total_parcel_mask)
             total_parcel_mask = (total_parcel_mask > 0)
             uniform_value = parcel_values_sum/pixel_count_sum
-            uniform_value_map = np.add(mask*uniform_value, total_parcel_mask)
+            uniform_value_map = np.add(total_parcel_mask*uniform_value, uniform_value_map)
 
             total_parcel_mask = (uniform_value_map > 0)
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'uniform_value_map': uniform_value_map}
+        elif(self.sample_mode == 'agg'):
+            uniform_value_map = np.zeros_like(masks[0])
+            total_parcel_mask = np.zeros_like(masks[0])
+            parcel_values_sum = 0
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                parcel_values_sum += parcel_values[i]
+                total_parcel_mask = np.add(mask, total_parcel_mask)
+            total_parcel_mask = (total_parcel_mask > 0)
+
+            parcel_values_sum = torch.from_numpy(np.array([parcel_values_sum]))
+
+            sample = {'image': image,'parcel_masks': np.array([np.array(total_parcel_mask).flatten()]),
+                'parcel_values':parcel_values_sum,'polygons': polygons,
+                'img_bbox': img_bbox}
         else:
             #for each mask turn to numpy array, flatten, and vstack
             masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]

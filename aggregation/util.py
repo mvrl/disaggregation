@@ -101,7 +101,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
 
-    if(sample_mode == 'uniform' or sample_mode =='agg' or sample_mode =='uniform_agg'):
+    if(sample_mode == 'uniform' or sample_mode =='uniform_agg'):
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle,
                             num_workers=cfg.train.num_workers)
 

@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 
 if __name__ == "__main__":
+    #These transforms must be applied somewhere to count correctly.
     transform = transforms.Compose([
         transforms.ToPILImage(),
         transforms.ToTensor()

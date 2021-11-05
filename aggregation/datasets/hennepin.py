@@ -54,8 +54,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.gdf = self.gdf[self.gdf['TOTAL_MV1'].between(self.gdf['TOTAL_MV1'].quantile(0.1), self.gdf['TOTAL_MV1'].quantile(0.9))]
         self.gdf = self.gdf[self.gdf['AVERAGE_MV1'].between(self.gdf['AVERAGE_MV1'].quantile(0.1), self.gdf['AVERAGE_MV1'].quantile(0.9))]
         
-        #Min-Max
-        self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
+        # Old Min-Max
+        #self.gdf['TOTAL_MV1'] = (self.gdf['TOTAL_MV1'] - min( self.gdf['TOTAL_MV1'] )) / ( max(self.gdf['TOTAL_MV1']) - min(self.gdf['TOTAL_MV1'])) * 1000
         
         # old clipping code
         #self.gdf['TOTAL_MV1']= self.gdf['TOTAL_MV1'].clip(self.gdf['TOTAL_MV1'].quantile(0.05),self.gdf['TOTAL_MV1'].quantile(0.95))

@@ -22,68 +22,8 @@ parcels_file = './hennepin_county_parcels/hennepin_county_parcels.shp'
 
 buildings_file = './hennepin_county_parcels/Minnesota_ESPG26915.shp'
 
-
-
-# Lets think about how this should work...
-
-# First we prune the dataset of outlier values and geometries...these become zero
-
-# Rasterizing parcel values
-def raster_parcel_values(bbox, row_bbox, fn, gdf, polygon):
-
-    df2 = gpd.GeoDataFrame(gpd.GeoSeries(polygon), columns=['geometry'])
-    df2.crs = "EPSG:26915"
-
-    intersections = gpd.overlay(gdf, df2, how='intersection')
-
-    #making the shapefile as an object.
-    input_shp = ogr.Open(intersections.to_json()) 
-
-    #getting layer information of shapefile.
-    shp_layer = input_shp.GetLayer()
-
-    #pixel_size determines the size of the new raster.
-    #pixel_size is proportional to size of shapefile.
-    pixel_size = int(args.gsd)
-
-    #get extent values to set size of output raster.
-    x_min, x_max, y_min, y_max = bbox
-
-    #calculate size/resolution of the raster.
-    x_res = int((x_max - x_min) / pixel_size)
-    y_res = int((y_max - y_min) / pixel_size)
-
-    #get GeoTiff driver by 
-    image_type = 'GTiff'
-    driver = gdal.GetDriverByName(image_type)
-
-    #passing the filename, x and y direction resolution, no. of bands, new raster.
-    new_raster = driver.Create(fn, x_res, y_res, 1, gdal.GDT_Int32)
-
-    #transforms between pixel raster space to projection coordinate space.
-    new_raster.SetGeoTransform((x_min, pixel_size, 0, y_min, 0, pixel_size))
-
-    #get required raster band.
-    band = new_raster.GetRasterBand(1)
-
-    #assign no data value to empty cells.
-    no_data_value = 0
-    band.SetNoDataValue(no_data_value)
-    band.FlushCache()
-
-    #main conversion method
-    gdal.RasterizeLayer(new_raster, [1], shp_layer, options=['ATTRIBUTE=AVERAGE_MV1'])
-
-    #adding a spatial reference
-    new_rasterSRS = osr.SpatialReference()
-    new_rasterSRS.ImportFromEPSG(2975)
-    new_raster.SetProjection(new_rasterSRS.ExportToWkt())
-
-# Rasterizing parcel values
-def raster_parcel_mask(bbox, row_bbox, fn):
-
-    # Filter shapefile
-    gdf = gpd.read_file(parcels_file, bbox = row_bbox)
+# Rasterizing parcel masks
+def raster_parcel_mask(bbox, row_bbox, fn, gdf):
     gdf.crs = "EPSG:26915"
 
     #making the shapefile as an object.
@@ -130,9 +70,7 @@ def raster_parcel_mask(bbox, row_bbox, fn):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing building masks 
-def raster_buildings(bbox, row_bbox, fn):
-
-    gdf = gpd.read_file(buildings_file, bbox = row_bbox)
+def raster_buildings(bbox, row_bbox, fn, gdf):
 
     gdf.crs = "EPSG:26915"
 
@@ -180,9 +118,7 @@ def raster_buildings(bbox, row_bbox, fn):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing building masks 
-def raster_boundary(bbox, row_bbox, fn):
-
-    gdf = gpd.read_file(parcels_file, bbox = row_bbox)
+def raster_boundary(bbox, row_bbox, fn, gdf):
 
     gdf.crs = "EPSG:26915"
 
@@ -232,9 +168,21 @@ def raster_boundary(bbox, row_bbox, fn):
     new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
 # Rasterizing building masks 
-def raster_masks(polygon, bbox, gdf, dir):
+def raster_masks(polygon, bbox, gdf, dir, combine_nearest = False):
 
     indexes = []
+
+    if combine_nearest:
+
+        for index,row in gdf.iterrows():
+            region_polygon = row['geometry']
+            gdf.drop(index)
+            nearest_index = gdf.sindex.nearest(region_polygon)
+            other_row = gdf.drop(nearest_index)
+            other_row.append(row)
+            print(other_row)
+            
+
 
     for index,row in gdf.iterrows():
 
@@ -315,13 +263,6 @@ if __name__ == "__main__":
 
     print( "done")
 
-    #gdf = gpd.read_file(parcels_file)
-
-
-    #gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
-    #Normalize...
-    #gdf['AVERAGE_MV1'] = (gdf['AVERAGE_MV1'] - min(gdf['AVERAGE_MV1'] )) / ( max(gdf['AVERAGE_MV1']) - min(gdf['AVERAGE_MV1']))
-
     gdf.set_crs("EPSG:26915")
     
     useful_indexes = []
@@ -345,29 +286,33 @@ if __name__ == "__main__":
             #polygon bounding box
             polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
 
+            spatial_index = gdf.sindex
+            possible_matches_index = list(spatial_index.intersection(polygon.bounds))
+            possible_matches = gdf.iloc[possible_matches_index]
+            precise_matches = possible_matches[possible_matches.intersects(polygon)]
+            #print(precise_matches)
+
             # For each BBOX generate raster and filepath
-            
-            #raster_parcel_values(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_value_path, gdf=gdf, polygon=polygon)
             if not os.path.exists(parcel_mask_path):
-                raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path)
+                raster_parcel_mask(bbox = image_bbox,row_bbox= row_bbox,fn=parcel_mask_path, gdf = precise_matches)
             if not os.path.exists(building_path):
-                raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path)
+                raster_buildings(bbox = image_bbox,row_bbox= row_bbox,fn=building_path, gdf = precise_matches)
             if not os.path.exists(boundary_path):
-                raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path)
+                raster_boundary(bbox = image_bbox,row_bbox= row_bbox,fn=boundary_path, gdf = precise_matches)
             if not os.path.exists(mask_dir):
                 os.mkdir(mask_dir)
             
-            indexes = raster_masks(polygon, image_bbox, gdf, mask_dir)
+            indexes = raster_masks(polygon, image_bbox, precise_matches, mask_dir, combine_nearest=True)
             #print(indexes)
 
-            useful_indexes.extend(indexes)
+            #useful_indexes.extend(indexes)
             #print(useful_indexes)
 
 
             pbar.update(1)
 
-    filtered_gdf = gdf.iloc[useful_indexes]
+    #filtered_gdf = gdf.iloc[useful_indexes]
 
     #print(filtered_gdf)
 
-    filtered_gdf.to_file(new_shp_path)
+    #filtered_gdf.to_file(new_shp_path)

@@ -232,8 +232,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
             parcel_values_sum = torch.from_numpy(np.array([parcel_values_sum]))
 
-            sample = {'image': image,'parcel_masks': np.array([np.array(total_parcel_mask).flatten()]),
-                'parcel_values':parcel_values_sum,'polygons': polygons,
+            sample = {'image': image,'masks': np.array([np.array(total_parcel_mask).flatten()]),
+                'values':parcel_values_sum,'polygons': polygons,
                 'img_bbox': img_bbox}
         else:
             #for each mask turn to numpy array, flatten, and vstack
@@ -241,12 +241,11 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             parcel_masks = np.vstack(masks)
 
             parcel_values = torch.from_numpy(parcel_values)
-            sample = {'image': image,'parcel_masks': parcel_masks,
-                'parcel_values':parcel_values,'polygons': polygons,
+            sample = {'image': image,'masks': parcel_masks,
+                'values':parcel_values,'polygons': polygons,
                 'img_bbox': img_bbox}
 
         return sample
-
 
 def generate_dasymetric_map(polygons, img_bbox):
     fig, ax = plt.subplots()

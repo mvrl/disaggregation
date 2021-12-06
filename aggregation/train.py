@@ -5,6 +5,11 @@ from config import cfg
 import modules
 import os
 from shutil import copyfile
+import warnings
+
+warnings.filterwarnings(
+    "ignore", ".*Trying to infer the `batch_size` from an ambiguous collection.*"
+)
 
 # Testing, small imports
 from pytorch_lightning.callbacks import ModelCheckpoint

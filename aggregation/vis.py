@@ -30,7 +30,7 @@ def generate_images(model, num_images, dir_path):
     c = 0
     with torch.no_grad():
         for sample in test_loader:
-            image, masks, value, polygons, img_bbox = sample
+            image, masks, value = sample
 
             value = value[0]
 

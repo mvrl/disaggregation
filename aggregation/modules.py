@@ -4,7 +4,7 @@ import util
 from models import unet
 import torch.nn as nn
 import torch.distributions as dist
-
+from config import cfg
 
 class RALModule(pl.LightningModule):
     def __init__(self,use_pretrained):
@@ -57,12 +57,12 @@ class RALModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('train_loss', output['loss'], on_epoch = True)
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('val_loss', output['loss'], on_epoch = True)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def test_step(self, batch, batch_idx):
@@ -117,12 +117,12 @@ class UniformModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('train_loss', output['loss'], on_epoch = True)
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('val_loss', output['loss'], on_epoch = True)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def test_step(self, batch, batch_idx):
@@ -185,12 +185,12 @@ class ProbabalisticModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('train_loss', output['loss'], on_epoch = True)
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('val_loss', output['loss'], on_epoch = True)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def test_step(self, batch, batch_idx):
@@ -256,12 +256,12 @@ class GaussModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('train_loss', output['loss'], on_epoch = True)
-        return output['loss']
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        return output['loss'] 
 
     def validation_step(self, batch, batch_idx):
         output = self.shared_step(batch)
-        self.log('val_loss', output['loss'], on_epoch = True)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def test_step(self, batch, batch_idx):

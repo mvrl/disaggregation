@@ -6,9 +6,12 @@ import numpy as np
 from torch.utils.data.dataloader import DataLoader
 from config import cfg
 from datasets import hennepin
+from datasets import cifar_dataset
 import torch.distributions as dist
 # CIFAR code from original paperß
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
+
+# This utility handles a lot of the special batching
 
 ''' 
     Losses
@@ -64,9 +67,6 @@ def gaussLoss(means, vars, targets):
     loss = torch.stack(losses, dim=0).mean()
     return loss
 
-
-
-'''Loss from the paper?'''
 def MSE(outputs, targets):
     losses = []
     for output,target in zip(outputs,targets):
@@ -83,10 +83,13 @@ def MAE(outputs, targets):
     return torch.stack(losses, dim=0).mean()
 
 def make_dataset(mode, sample_mode = ''):
-    this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, sample_mode)
+    if cfg.data.name == 'hennepin':
+        this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, sample_mode)
+    elif cfg.data.name == 'cifar':
+        this_dataset = cifar_dataset.dataset_cifar(mode)
     return this_dataset
 
-def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.sample_mode):
+def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.hennepin.sample_mode):
     this_dataset = make_dataset(mode, sample_mode)
 
     torch.manual_seed(0)
@@ -125,58 +128,15 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
 
     return train_loader, val_loader, test_loader
 
-def make_vis_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.sample_mode):
-    this_dataset = make_dataset(mode, sample_mode)
-
-    torch.manual_seed(0)
-    
-    train_size = int( np.floor(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
-    val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
-    test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
-
-
-    print(len(this_dataset), len(this_dataset)*0.6, len(this_dataset)*0.2, test_size)
-
-    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle, collate_fn = my_collate,
-                            num_workers=cfg.train.num_workers)
-
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn = my_collate,
-                            num_workers=cfg.train.num_workers)
-
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn = vis_collate,
-                            num_workers=cfg.train.num_workers)
-
-    # set the random seed back 
-    torch.random.seed()
-
-    return train_loader, val_loader, test_loader
-
 # Minibatch creation for variable size targets in Hennepin Dataset
 def my_collate(batch):
 
     #Masks and values are in lists        
-    mask = [item['parcel_masks'] for item in batch]
-    value = [item['parcel_values'] for item in batch]
+    mask = [item['masks'] for item in batch]
+    value = [item['values'] for item in batch]
 
     image = [item['image'].unsqueeze(0) for item in batch]
     image = torch.cat(image)
 
     return image, mask, value
-
-# Minibatch creation for variable size targets in Hennepin Dataset
-def vis_collate(batch):
-
-    #Masks and values are in lists        
-    mask = [item['parcel_masks'] for item in batch]
-    value = [item['parcel_values'] for item in batch]
-
-    image = [item['image'].unsqueeze(0) for item in batch]
-    image = torch.cat(image)
-
-    polygons = [item['polygons'] for item in batch]
-    img_bbox = [item['img_bbox'] for item in batch]
-
-    return image, mask, value, polygons, img_bbox
 

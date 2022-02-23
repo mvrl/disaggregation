@@ -8,6 +8,9 @@ import geopandas as gpd
 import argparse
 import shapely
 from geofeather import to_geofeather, from_geofeather
+import random
+#import pygeos 
+import pandas as pd
 
 # Code modifed from here
 #https://gis.stackexchange.com/questions/352495/converted-vector-to-raster-file-is-black-and-white-in-colour-gdal-rasterize
@@ -170,19 +173,7 @@ def raster_boundary(bbox, row_bbox, fn, gdf):
 # Rasterizing building masks 
 def raster_masks(polygon, bbox, gdf, dir, combine_nearest = False):
 
-    indexes = []
-
-    if combine_nearest:
-
-        for index,row in gdf.iterrows():
-            region_polygon = row['geometry']
-            gdf.drop(index)
-            nearest_index = gdf.sindex.nearest(region_polygon)
-            other_row = gdf.drop(nearest_index)
-            other_row.append(row)
-            print(other_row)
-            
-
+    indexes = []      
 
     for index,row in gdf.iterrows():
 
@@ -237,7 +228,7 @@ def raster_masks(polygon, bbox, gdf, dir, combine_nearest = False):
             new_rasterSRS.ImportFromEPSG(2975)
             new_raster.SetProjection(new_rasterSRS.ExportToWkt())
 
-    return indexes
+    #return gdf
 
 
 # Loop through generated CSV
@@ -264,6 +255,8 @@ if __name__ == "__main__":
     print( "done")
 
     gdf.set_crs("EPSG:26915")
+
+    #gdf = gdf[['PID', 'geometry', 'TOTAL_MV1']]
     
     useful_indexes = []
 
@@ -286,11 +279,15 @@ if __name__ == "__main__":
             #polygon bounding box
             polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
 
+            #print(gdf)
+
+            #Filter By Bounding Box, uses spatial index for speed
             spatial_index = gdf.sindex
             possible_matches_index = list(spatial_index.intersection(polygon.bounds))
             possible_matches = gdf.iloc[possible_matches_index]
             precise_matches = possible_matches[possible_matches.intersects(polygon)]
-            #print(precise_matches)
+            precise_matches.reset_index(inplace = True, drop = True)
+
 
             # For each BBOX generate raster and filepath
             if not os.path.exists(parcel_mask_path):
@@ -302,7 +299,8 @@ if __name__ == "__main__":
             if not os.path.exists(mask_dir):
                 os.mkdir(mask_dir)
             
-            indexes = raster_masks(polygon, image_bbox, precise_matches, mask_dir, combine_nearest=True)
+            
+            raster_masks(polygon, image_bbox, precise_matches, mask_dir, combine_nearest=True)
             #print(indexes)
 
             #useful_indexes.extend(indexes)

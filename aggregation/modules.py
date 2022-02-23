@@ -51,7 +51,7 @@ class RALModule(pl.LightningModule):
         
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
-        loss = util.MAE(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values)
         
         return {'loss': loss}
 
@@ -88,7 +88,7 @@ class UniformModule(pl.LightningModule):
             model_state.update(pretrained_state)
             self.unet.load_state_dict(model_state)
 
-        self.loss = nn.L1Loss()
+        self.loss = nn.L2Loss()
         self.agg = util.regionAgg_layer()
 
     def forward(self, x):
@@ -134,7 +134,7 @@ class UniformModule(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-class ProbabalisticModule(pl.LightningModule):
+class RSampleModule(pl.LightningModule):
     def __init__(self,use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
@@ -153,7 +153,7 @@ class ProbabalisticModule(pl.LightningModule):
 
     def get_valOut(self, x):
         means, stds = self(x)
-        return means.unsqueeze(1)
+        return means.unsqueeze(1), stds.unsqueeze(1)
 
     def forward(self, x):
         x = self.unet(x)
@@ -173,13 +173,16 @@ class ProbabalisticModule(pl.LightningModule):
 
         means, stds = self(image)
 
+        # some floating point error exists, stay above 0
+        stds = stds + 1e-10
+
         gauss = dist.Normal(means, stds)
         sample = gauss.rsample()
         output = torch.flatten(sample, start_dim=1)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
-        loss = util.MAE(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values)
 
         return {'loss': loss}
 

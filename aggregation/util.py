@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data.dataloader import DataLoader
 from config import cfg
 from datasets import hennepin
-from datasets import cifar_dataset
+#from datasets import cifar_dataset
 import torch.distributions as dist
 # CIFAR code from original paperß
 # https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
@@ -84,9 +84,9 @@ def MAE(outputs, targets):
 
 def make_dataset(mode, sample_mode = ''):
     if cfg.data.name == 'hennepin':
-        this_dataset = hennepin.dataset_hennepin(mode, cfg.data.root_dir, sample_mode)
-    elif cfg.data.name == 'cifar':
-        this_dataset = cifar_dataset.dataset_cifar(mode)
+        this_dataset = hennepin.dataset_hennepin(mode, cfg.data.hennepin.root_dir, sample_mode)
+    #elif cfg.data.name == 'cifar':
+    #    this_dataset = cifar_dataset.dataset_cifar(mode)
     return this_dataset
 
 def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mode =cfg.data.hennepin.sample_mode):
@@ -104,7 +104,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
 
-    if(sample_mode == 'uniform' or sample_mode =='uniform_agg'):
+    if(sample_mode == 'uniform' or sample_mode =='uniform_agg'or sample_mode =='combine_uniform'):
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle,
                             num_workers=cfg.train.num_workers)
 
@@ -124,7 +124,7 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
                             num_workers=cfg.train.num_workers)
 
     # set the random seed back 
-    torch.random.seed()
+    #torch.random.seed()
 
     return train_loader, val_loader, test_loader
 

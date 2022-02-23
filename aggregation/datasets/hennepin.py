@@ -22,6 +22,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.mode = mode
         self.data_dir = data_dir
         self.sample_mode = sample_mode
+        random.seed(0)
 
         #handling paths
         csv_path = os.path.join(self.data_dir, 'hennepin_bbox.csv')
@@ -31,6 +32,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         values_pickle_file = os.path.join(self.data_dir, 'hennepin_vals.pkl')
         masks_pickle_file = os.path.join(self.data_dir, 'hennepin_masks.pkl')
         paths_pickle_file = os.path.join(self.data_dir, 'hennepin_paths.pkl')
+        pids_pickle_file = os.path.join(self.data_dir, 'hennepin_pids.pkl')
 
         self.df = pd.read_csv(csv_path)
 
@@ -75,6 +77,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         self.all_values = []
         self.all_mask_paths = []
         self.all_rows = []
+        self.all_pids = []
 
         if os.path.exists(values_pickle_file):
             with open(values_pickle_file, 'rb') as f:
@@ -83,6 +86,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 self.all_mask_paths = pickle.load(f)
             with open(paths_pickle_file, 'rb') as f:
                 self.all_rows = pickle.load(f)
+            with open(pids_pickle_file, 'rb') as f:
+                self.all_pids = pickle.load(f)
         else:
             for index,row in tqdm(self.df.iterrows(), total =len(self.df)):
                 # Grab path from CSV dataframe
@@ -91,6 +96,7 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 # Load in masks, build aggregation matrix
                 masks_dir = os.path.join(dir_path, 'masks')
                 values = []
+                pids = []
                 masks = []
 
                 if(os.path.isdir(masks_dir)):
@@ -112,12 +118,15 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                                 continue
                             
                             values.append(value)
+                            pids.append(pid)
                             masks.append(img_path)
+
                 if values != []:
                     values = np.stack(values)
                     self.all_values.append(values)
                     self.all_mask_paths.append(masks)
                     self.all_rows.append(row)
+                    self.all_pids.append(pids)
 
             with open(values_pickle_file, 'wb') as f:
                 pickle.dump(self.all_values, f)
@@ -125,6 +134,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 pickle.dump(self.all_mask_paths, f)
             with open(paths_pickle_file, 'wb') as f:
                 pickle.dump(self.all_rows, f)
+            with open(pids_pickle_file, 'wb') as f:
+                pickle.dump(self.all_pids, f)
 
         print("Done...")
         
@@ -162,7 +173,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         row_bbox = (row['lat_min'], row['lon_min'],row['lat_max'], row['lon_max'])
         img_bbox = (row['lat_min'], row['lat_max'],row['lon_min'], row['lon_max']) 
 
-        # We should only do this during testing since it really slows things down?
+        # Fetch the Polygons
+        # We should only do this during testing/visualization since it really slows things down
         if(self.mode == 'vis'):
             bbox_polygon = shapely.geometry.box(row['lat_min'], row['lon_min'], row['lat_max'], row['lon_max'])
             df2 = gpd.GeoDataFrame(gpd.GeoSeries(bbox_polygon), columns=['geometry'])
@@ -171,7 +183,8 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
         else:
             polygons = 0
 
-        if self.mode == 'train':            # random flips during training
+        #Random flips, train datas augmentation
+        if self.mode == 'train':          
 
             if random.random() > 0.5:
                 image = transforms_function.hflip(image)
@@ -181,12 +194,22 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                 image = transforms_function.vflip(image)
                 masks = [transforms_function.vflip(mask) for mask in masks]
 
+            if random.random() > 0.5:
+                image = transforms_function.rotate(image, 90, transforms.InterpolationMode.BILINEAR)
+                masks = [transforms_function.rotate(mask, 90, transforms.InterpolationMode.BILINEAR) for mask in masks]
+
+            if random.random() > 0.5:
+                image = transforms_function.rotate(image, 270, transforms.InterpolationMode.BILINEAR)
+                masks = [transforms_function.rotate(mask, 270, transforms.InterpolationMode.BILINEAR) for mask in masks]
+
+        #normalization
         if self.mode != 'vis':
             #Apply Transformation
             image = self.transform(image)
         else:
             image = self.to_tensor(image)
 
+        #Grab the values
         parcel_values = self.all_values[idx] #np.vstack(values)
        
         if(self.sample_mode == 'uniform'):
@@ -202,7 +225,112 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'uniform_value_map': uniform_value_map}
-        elif(self.sample_mode == 'uniform_agg'):
+
+        #randomly select, and combine parcels with their nearest neighbor
+        elif(self.sample_mode == 'combine'):
+            #Fetch pids, we will need the gdf index
+            pids = self.all_pids[idx]
+            masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]
+            
+            parcel_values = torch.from_numpy(parcel_values)
+
+            if(len(pids) > 1):
+
+                geoms = []
+
+                for pid in pids:
+                    geoms.append( self.gdf.loc[self.gdf['PID'] == pid]['geometry'].values[0] )
+                
+                combine_length = int(len(geoms) / 2)
+                for x in range(combine_length):
+                    #randomly select index
+                    randomINDEX = random.randint(0, len(geoms) - 1)
+                    parcel_geom = geoms[randomINDEX]
+                    #print(parcel_geom)
+                    others = geoms.copy()
+                    del others[randomINDEX]
+                    others = gpd.GeoSeries(others)
+
+
+                    #print(others.distance(parcel_geom) )
+                    distances = others.distance(parcel_geom)
+                    min_value = np.min( distances )
+                    #print(others.index(min_value))
+                    closestGEOM = others[distances == min_value].values[0]
+                    #print(closestGEOM)
+                    closestINDEX = geoms.index(closestGEOM)
+
+                    #print("RANDOM_INDEX: ", randomINDEX)
+                    #print("closest_index: ", closestINDEX)
+                    del geoms[randomINDEX]
+                    masks[closestINDEX] = masks[closestINDEX] + masks[randomINDEX]
+                    parcel_values[closestINDEX] = parcel_values[closestINDEX] + parcel_values[randomINDEX]
+                    
+                    del masks[randomINDEX]
+                    #masks = np.delete(masks,randomINDEX)
+                    parcel_values = np.delete(parcel_values,randomINDEX)
+                    
+                    
+            #Masks will be reduced by n/2
+            #values will be reduced by n/2
+            # TODO polygon combination, unimplemented
+            #bbox stays the same
+            masks = np.vstack(masks)
+
+            sample = {'image': image,'masks': masks,
+                'values':parcel_values,'polygons': polygons,
+                'img_bbox': img_bbox}
+        #randomly select, and combine parcels with their nearest neighbor
+        elif(self.sample_mode == 'combine_uniform'):
+            #Fetch pids, we will need the gdf index
+            pids = self.all_pids[idx]
+            masks = [torch.from_numpy( np.array(mask)) for mask in masks]
+            
+            #parcel_values = torch.from_numpy(parcel_values)
+
+            if(len(pids) > 1):
+
+                geoms = []
+
+                for pid in pids:
+                    geoms.append( self.gdf.loc[self.gdf['PID'] == pid]['geometry'].values[0] )
+                
+                combine_length = int(len(geoms) / 2)
+                for x in range(combine_length):
+                    #randomly select index
+                    randomINDEX = random.randint(0, len(geoms) - 1)
+                    parcel_geom = geoms[randomINDEX]
+                    #print(parcel_geom)
+                    others = geoms.copy()
+                    del others[randomINDEX]
+                    others = gpd.GeoSeries(others)
+
+
+                    #print(others.distance(parcel_geom) )
+                    distances = others.distance(parcel_geom)
+                    min_value = np.min( distances )
+                    #print(others.index(min_value))
+                    closestGEOM = others[distances == min_value].values[0]
+                    #print(closestGEOM)
+                    closestINDEX = geoms.index(closestGEOM)
+
+                    #print("RANDOM_INDEX: ", randomINDEX)
+                    #print("closest_index: ", closestINDEX)
+                    del geoms[randomINDEX]
+                    masks[closestINDEX] = masks[closestINDEX] + masks[randomINDEX]
+                    parcel_values[closestINDEX] = parcel_values[closestINDEX] + parcel_values[randomINDEX]
+                    
+                    del masks[randomINDEX]
+                    #masks = np.delete(masks,randomINDEX)
+                    parcel_values = np.delete(parcel_values,randomINDEX)
+                    
+                    
+            #Masks will be reduced by n/2
+            #values will be reduced by n/2
+            # TODO polygon combination, unimplemented
+            #bbox stays the same
+            #masks = np.vstack(masks)
+
             uniform_value_map = np.zeros_like(masks[0])
             total_parcel_mask = np.zeros_like(masks[0])
             pixel_count_sum = 0
@@ -220,21 +348,11 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
             total_parcel_mask = (uniform_value_map > 0)
             sample = {'image':image, 'total_parcel_mask':total_parcel_mask,
                         'uniform_value_map': uniform_value_map}
-        elif(self.sample_mode == 'agg'):
-            uniform_value_map = np.zeros_like(masks[0])
-            total_parcel_mask = np.zeros_like(masks[0])
-            parcel_values_sum = 0
-            for i,mask in enumerate(masks):
-                mask = np.array(mask)
-                parcel_values_sum += parcel_values[i]
-                total_parcel_mask = np.add(mask, total_parcel_mask)
-            total_parcel_mask = (total_parcel_mask > 0)
 
-            parcel_values_sum = torch.from_numpy(np.array([parcel_values_sum]))
-
-            sample = {'image': image,'masks': np.array([np.array(total_parcel_mask).flatten()]),
-                'values':parcel_values_sum,'polygons': polygons,
-                'img_bbox': img_bbox}
+            #sample = {'image': image,'masks': masks,
+            #    'values':parcel_values,'polygons': polygons,
+            #    'img_bbox': img_bbox}
+            
         else:
             #for each mask turn to numpy array, flatten, and vstack
             masks = [torch.from_numpy( np.array(mask).flatten()) for mask in masks]

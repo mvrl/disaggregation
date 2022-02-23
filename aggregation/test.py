@@ -69,6 +69,8 @@ if __name__ == '__main__':
     ckpt_path = os.path.join(dir_path,'best.ckpt')
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
+    torch.cuda.set_device(1)
+    
     model = loadModel(ckpt_path , cfg.train.model)
 
     mae_error, mse_error, per_chip_error = generate_pred_lists(model, dir_path)

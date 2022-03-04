@@ -1,3 +1,4 @@
+from turtle import color
 import matplotlib.pyplot as plt
 import util
 import torch
@@ -154,30 +155,39 @@ def generate_scatter(model, dir_path):
 
 def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
 
-    cmap =  'viridis'
+    min_lim = 0
+    max_lim = 256
 
     #plt.set_title("Image")
     plt.imshow(image.permute(1,2,0)) 
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "image"), bbox_inches='tight', pad_inches=0)
     plt.close()
 
     plt.imshow(region_map , cmap = 'terrain')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "region_map"), bbox_inches='tight', pad_inches=0)
     plt.close()
 
     plt.imshow(pred_map , cmap = 'Greens')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "pred_map"), bbox_inches='tight', pad_inches=0)
     plt.close()
 
     plt.imshow(true_map , cmap = 'Greens')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "true_map"), bbox_inches='tight', pad_inches=0)
     plt.close()
 
@@ -185,21 +195,78 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
     plt.imshow(vals.permute(1,2,0) , cmap = 'Greens')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "value_pred"), bbox_inches='tight', pad_inches=0)
     plt.close()
     #axs[0][1].set_title("Value Prediction")
 
     if cfg.train.model == 'gauss' or 'rsample':
-        plt.imshow(vars.permute(1,2,0), cmap = 'Reds', norm=colors.LogNorm())
-        plt.tight_layout(pad=0)
+        plt.imshow(vars.permute(1,2,0), cmap = 'Reds')
+        #plt.tight_layout(pad=0)
         plt.axis('off')
-        plt.savefig(os.path.join(path, "vars"), bbox_inches='tight', pad_inches=0)
+        plt.colorbar()
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars"))
+        plt.close()
+
+        plt.imshow(vars.permute(1,2,0), cmap = 'Reds', norm=colors.LogNorm())
+        #plt.tight_layout(pad=0)
+        plt.colorbar()
+        plt.axis('off')
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars_log"))
+        plt.close()
+        #axs[1][1].set_title("Variance")
+
+        plt.imshow(vars.permute(1,2,0), cmap = 'Reds', vmin=0,vmax=1e-8)
+        #plt.tight_layout(pad=0)
+        plt.colorbar()
+        plt.axis('off')
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars_clipped"))
+        plt.close()
+
+        color_map = plt.cm.get_cmap('Blues')
+        plt.imshow(vars.permute(1,2,0), cmap = color_map.reversed())
+        #plt.tight_layout(pad=0)
+        plt.colorbar()
+        plt.axis('off')
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars_reversed"))
+        plt.close()
+
+        color_map = plt.cm.get_cmap('Blues')
+        plt.imshow(vars.permute(1,2,0), cmap = color_map.reversed() , vmin=0,vmax=1e-8)
+        #plt.tight_layout(pad=0)
+        plt.colorbar()
+        plt.axis('off')
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars_reversed_clipped"))
+        plt.close()
+        #axs[1][1].set_title("Variance")
+
+        color_map = plt.cm.get_cmap('Blues')
+        plt.imshow(vars.permute(1,2,0), cmap = color_map.reversed(), norm=colors.LogNorm())
+        #plt.tight_layout(pad=0)
+        plt.colorbar()
+        plt.axis('off')
+        plt.xlim(min_lim, max_lim)
+        plt.ylim(min_lim, max_lim)
+        plt.savefig(os.path.join(path, "vars_reversed_lognorm"))
         plt.close()
         #axs[1][1].set_title("Variance")
 
     plt.imshow(error, cmap = 'Greys')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.xlim(min_lim, max_lim)
+    plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "error_map"), bbox_inches='tight', pad_inches=0)
     plt.close()
     #axs[1][0].set_title("True Value Map")

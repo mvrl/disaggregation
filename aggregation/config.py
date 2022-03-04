@@ -28,16 +28,16 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (512, 512)        # Used in visualizations
 
 
-cfg.experiment_name = 'gauss_interim'
+cfg.experiment_name = 'rsample_final_1_pretrained'
 
 
 cfg.train = edict()
 cfg.mode = 'train'
-cfg.train.model = 'gauss'
+cfg.train.model = 'rsample'
 
 cfg.train.use_pretrained = True
 
-cfg.train.patience = 3
+cfg.train.patience = 25
 
 cfg.train.validation_split = 0.1         # percentage validation
 cfg.train.test_split = 0.1               # percentage test

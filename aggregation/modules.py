@@ -153,6 +153,7 @@ class RSampleModule(pl.LightningModule):
 
     def forward(self, x):
         x = self.unet(x)
+        #x = self.softplus(x)
         
         means = x[:,0]
         vars = x[:,1]

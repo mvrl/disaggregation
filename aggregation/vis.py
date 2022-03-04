@@ -9,20 +9,19 @@ import pickle
 import seaborn as sns
 from config import cfg
 import test
+from cmath import nan
+from matplotlib import colors
+
 '''
     Generate Visualizations
 
-    TBD:    -generate batch-wise visualizations
+    TODO:    -generate batch-wise visualizations
             -move arbitrary paths to config.
 
 
     set a config setup for saving models, saving results, saving visualizations, 
     lightning_logs?, be able to tensorboard all of them?
 '''
-
-# This is a py script of the original jupyter notebook
-# It will save all the generated visualizations to /outputs
-# Come up with some naming scheme
 
 def generate_images(model, num_images, dir_path):
     train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'vis', sample_mode='')
@@ -32,16 +31,36 @@ def generate_images(model, num_images, dir_path):
         for sample in test_loader:
             image, masks, value = sample
 
-            vals, stds = model.get_valOut(image)
+            if cfg.train.model == 'gauss' or 'rsample':
+                vals, vars = model.get_valOut(image)
+            else:
+                vals= model.get_valOut(image)   
+                vars=0 # NO STANDARD DEVIATIONS
 
             estimated_values = model.pred_Out(image, masks)
             #estimated_values = estimated_values.cpu().detach().numpy()
 
             masks = masks[0]
             value = value[0]
-            estimated_values = estimated_values[0]
-            errors = np.zeros_like(masks[0])
-            mask_sum= np.zeros_like(masks[0])
+            estimated_values= estimated_values[0]
+            errors = mask_sum = pred_map = region_map = true_map = np.zeros_like(masks[0])
+
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                region_map = np.add(mask*np.random.randint(0,1000), region_map)
+
+            region_map = region_map.reshape(cfg.data.cutout_size).astype('float64')
+            region_map[region_map==0] = nan
+
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                mask_sum += mask
+                pixel_count = (mask == 1).sum()
+                uniform_value = estimated_values[i]/pixel_count
+                uniform_value = uniform_value.cpu().detach().numpy()
+                pred_map = np.add(mask*uniform_value, pred_map)
+            
+            pred_map = pred_map.reshape(cfg.data.cutout_size)
 
             for i,mask in enumerate(masks):
                 mask = np.array(mask)
@@ -53,12 +72,24 @@ def generate_images(model, num_images, dir_path):
             
             errors = errors.reshape(cfg.data.cutout_size)
 
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                pixel_count = (mask == 1).sum()
+                uniform_value = value[i]/pixel_count
+                uniform_value = uniform_value.cpu().detach().numpy()
+                true_map = np.add(mask*uniform_value, true_map)
+            
+            true_map = true_map.reshape(cfg.data.cutout_size)
+
             #stds = stds.squeeze(0).squeeze(0).cpu().detach().numpy() * mask_sum.reshape(512,512)
             #vals = vals.squeeze(0).squeeze(0).cpu().detach().numpy() * mask_sum.reshape(512,512)
 
             path =  os.path.join(dir_path, str(c) )
 
-            generate_plot(image.squeeze(0),vals.squeeze(0),stds.squeeze(0),errors, path)
+            if not(os.path.exists(path)):
+                os.mkdir(path)
+
+            generate_plot(image.squeeze(0),vals.squeeze(0),vars.squeeze(0),pred_map,true_map, region_map,errors, path)
             c+=1
             if c >= num_images:
                 return
@@ -79,8 +110,6 @@ def generate_scatter(model, dir_path):
 
     plt.scatter(value_arr,estimated_arr, s=0.2)
     plt.title("Prediction Scatter Plot")
-    plt.ylim(0,1000)
-    plt.xlim(0,1000)
     plt.xlabel("True Value")
     plt.ylabel("Estimated Value")
     plt.savefig(scatter_pth)
@@ -92,7 +121,7 @@ def generate_scatter(model, dir_path):
     plt.savefig(os.path.join(dir_path,"true_value_hist.png"))
     plt.close()
 
-    ax = sns.kdeplot(x = value_arr, y = estimated_arr, clip = (0,1000),
+    ax = sns.kdeplot(x = value_arr, y = estimated_arr,
      fill= True, thresh=0, levels =100,cmap="mako")
     ax.set(xlabel = "True Values", ylabel = "Estimated Value", title= "Prediction Density Plot")
     plt.savefig(density_pth)
@@ -123,36 +152,58 @@ def generate_scatter(model, dir_path):
 
 
 
-def generate_plot(image,vals, stds, error, path):
+def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
 
     cmap =  'viridis'
 
-    fig, axs = plt.subplots(2,2,figsize=(20,20))
-    axs[0][0].imshow(image.permute(1,2,0)) 
-    axs[0][0].axis('off')
-    #axs[0][0].set_title("Image")
+    #plt.set_title("Image")
+    plt.imshow(image.permute(1,2,0)) 
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "image"), bbox_inches='tight', pad_inches=0)
+    plt.close()
 
+    plt.imshow(region_map , cmap = 'terrain')
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "region_map"), bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    plt.imshow(pred_map , cmap = 'Greens')
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "pred_map"), bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    plt.imshow(true_map , cmap = 'Greens')
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "true_map"), bbox_inches='tight', pad_inches=0)
+    plt.close()
 
     print(vals.shape)
-    axs[1][0].imshow(vals.permute(1,2,0) , cmap = 'Greens')
-    axs[1][0].axis('off')
+    plt.imshow(vals.permute(1,2,0) , cmap = 'Greens')
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "value_pred"), bbox_inches='tight', pad_inches=0)
+    plt.close()
     #axs[0][1].set_title("Value Prediction")
 
-    axs[1][1].imshow(stds.permute(1,2,0), cmap = cmap)
-    axs[1][1].axis('off')
-    #axs[1][1].set_title("Standard deviations")
+    if cfg.train.model == 'gauss' or 'rsample':
+        plt.imshow(vars.permute(1,2,0), cmap = 'Reds', norm=colors.LogNorm())
+        plt.tight_layout(pad=0)
+        plt.axis('off')
+        plt.savefig(os.path.join(path, "vars"), bbox_inches='tight', pad_inches=0)
+        plt.close()
+        #axs[1][1].set_title("Variance")
 
-    # This needs proper color scalings... unsure how to do this
-    axs[0][1].imshow(error, cmap = cmap)
+    plt.imshow(error, cmap = 'Greys')
+    plt.tight_layout(pad=0)
+    plt.axis('off')
+    plt.savefig(os.path.join(path, "error_map"), bbox_inches='tight', pad_inches=0)
+    plt.close()
     #axs[1][0].set_title("True Value Map")
-    axs[0][1].axis('off')
-    fig.tight_layout(pad=0)
-    plt.savefig(path)
-    plt.close(fig)
-
-
-
-
+  
 
 
 if __name__ == '__main__':

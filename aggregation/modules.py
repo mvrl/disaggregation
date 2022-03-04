@@ -6,12 +6,12 @@ import torch.nn as nn
 import torch.distributions as dist
 from config import cfg
 
+# Linear Basline
 class RALModule(pl.LightningModule):
     def __init__(self,use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=1)
 
-        # This wont work, since the pretrained unet has 2 output channels
         if(use_pretrained):
             pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
 
@@ -19,14 +19,11 @@ class RALModule(pl.LightningModule):
             pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
             model_state.update(pretrained_state)
             self.unet.load_state_dict(model_state)
-        
-        self.softplus = nn.Softplus()
-        self.agg = util.regionAgg_layer()
 
+        self.agg = util.regionAgg_layer()
 
     def forward(self, x):
         x = self.unet(x)
-        x = self.softplus(x)
         x = torch.flatten(x, start_dim=1)
         return x
 
@@ -36,7 +33,6 @@ class RALModule(pl.LightningModule):
 
     def get_valOut(self, x):
         x = self.unet(x)
-        x = self.softplus(x)
         return x
 
     def pred_Out(self, x, masks):
@@ -88,7 +84,7 @@ class UniformModule(pl.LightningModule):
             model_state.update(pretrained_state)
             self.unet.load_state_dict(model_state)
 
-        self.loss = nn.L2Loss()
+        self.loss = nn.L1Loss()
         self.agg = util.regionAgg_layer()
 
     def forward(self, x):
@@ -139,7 +135,6 @@ class RSampleModule(pl.LightningModule):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        # This wont work, since the pretrained unet has 2 output channels
         if(use_pretrained):
             pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
 
@@ -152,18 +147,24 @@ class RSampleModule(pl.LightningModule):
         self.agg = util.regionAgg_layer()
 
     def get_valOut(self, x):
-        means, stds = self(x)
-        return means.unsqueeze(1), stds.unsqueeze(1)
+        means, vars = self(x)
+        
+        return means.unsqueeze(1), vars.unsqueeze(1)
 
     def forward(self, x):
         x = self.unet(x)
-        x = self.softplus(x)
+        
         means = x[:,0]
-        stds = x[:,1]
-        return means, stds
+        vars = x[:,1]
+        vars = self.softplus(vars)
+
+        #stay above 0
+        vars = vars + 1e-16
+
+        return means, vars
 
     def pred_Out(self, x, masks):
-        means, stds = self(x)
+        means, vars = self(x)
         output = torch.flatten(means, start_dim=1)
         estimated_values = self.agg(output, masks)
         return estimated_values
@@ -171,12 +172,10 @@ class RSampleModule(pl.LightningModule):
     def shared_step(self, batch):
         image, parcel_masks, parcel_values = batch
 
-        means, stds = self(image)
+        means, vars = self(image)
 
-        # some floating point error exists, stay above 0
-        stds = stds + 1e-10
 
-        gauss = dist.Normal(means, stds)
+        gauss = dist.Normal(means, torch.sqrt(vars))
         sample = gauss.rsample()
         output = torch.flatten(sample, start_dim=1)
         
@@ -210,7 +209,6 @@ class GaussModule(pl.LightningModule):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        # This wont work, since the pretrained unet has 2 output channels
         if(use_pretrained):
             pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
 
@@ -221,25 +219,22 @@ class GaussModule(pl.LightningModule):
         
         self.softplus = nn.Softplus()
         self.agg = util.regionAgg_layer()
-        self.gauss_agg = util.gaussAgg_layer()
-
-        # For the gaussian distribution summations, how should I consider the value prediction at inference time?
 
     def forward(self, x):
         x = self.unet(x)
-        x = self.softplus(x)
         means = x[:,0]
         vars = x[:,1] 
+        vars = self.softplus(vars)
         means = torch.flatten(means, start_dim=1)
         vars = torch.flatten(vars, start_dim=1)
         return means, vars
 
     def get_valOut(self, x):
         x = self.unet(x)
-        x = self.softplus(x)
         means = x[:,0]
         vars = x[:,1] 
-        return means.unsqueeze(1)
+        vars = self.softplus(vars)
+        return means, vars
 
     def pred_Out(self, x, masks):
          means, vars = self(x)
@@ -252,9 +247,10 @@ class GaussModule(pl.LightningModule):
         means, vars = self(image)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
-        means, vars = self.gauss_agg(means, vars, parcel_masks)
+        means= self.agg(means, parcel_masks)
+        vars = self.agg(vars, parcel_masks)
+
         loss = util.gaussLoss(means, vars, parcel_values)
-        
         return {'loss': loss}
 
     def training_step(self, batch, batch_idx):

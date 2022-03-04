@@ -108,4 +108,5 @@ class dataset_cifar(Dataset):
 
         sample = {'image': image_tensor,'voronoi': voronoi, 'masks': masks,
                 'values':region_sums, 'uniform': uniform_map, 'Y': Y}
+        
         return sample

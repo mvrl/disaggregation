@@ -1,5 +1,6 @@
 # Requirements
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping
 import util
 from config import cfg
 import modules
@@ -38,7 +39,11 @@ if __name__ == '__main__':
 
     check_callback = ModelCheckpoint(monitor='val_loss', save_last=True, save_top_k=3, mode='min', filename='{epoch}-{val_loss:.2f}-{train_loss:.2f}')
 
-    trainer = pl.Trainer(gpus=cfg.train.device_ids, max_epochs = cfg.train.num_epochs, callbacks=[check_callback])
+
+    early_stopping = EarlyStopping('val_loss', patience=cfg.train.patience)
+
+    
+    trainer = pl.Trainer(gpus=cfg.train.device_ids,check_val_every_n_epoch=5, max_epochs = cfg.train.num_epochs, callbacks=[check_callback,early_stopping])
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

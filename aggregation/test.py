@@ -51,11 +51,12 @@ def generate_pred_lists(model, dir_path):
         pickle.dump(per_chip_errors, fp)
 
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
+    relative_error = mae_errors / np.array(value_arr)
     mse_errors = np.array(value_arr) - np.array(estimated_arr)
     mse_errors = np.power(mse_errors,2)
     per_chip_error = np.abs(np.array(per_chip_errors)).mean()
 
-    return mae_errors.mean(), mse_errors.mean(), per_chip_error
+    return mae_errors.mean(), mse_errors.mean(), per_chip_error, relative_error.mean()*100
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
     model =train.chooseModel(model_name)
@@ -70,11 +71,11 @@ if __name__ == '__main__':
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
     torch.cuda.set_device(1)
-    
+
     model = loadModel(ckpt_path , cfg.train.model)
 
-    mae_error, mse_error, per_chip_error = generate_pred_lists(model, dir_path)
+    mae_error, mse_error, per_chip_error, percent_error = generate_pred_lists(model, dir_path)
 
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nPer Chip MAE: "+ str(per_chip_error) ]
+    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nPer Chip MAE: "+ str(per_chip_error), "\nAvg Percent Error: "+ str(percent_error)  ]
     test_file.writelines(L)

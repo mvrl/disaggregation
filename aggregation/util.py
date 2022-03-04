@@ -6,10 +6,7 @@ import numpy as np
 from torch.utils.data.dataloader import DataLoader
 from config import cfg
 from datasets import hennepin
-#from datasets import cifar_dataset
 import torch.distributions as dist
-# CIFAR code from original paperß
-# https://github.com/orbitalinsight/region-aggregation-public/blob/master/run_cifar10.py
 
 # This utility handles a lot of the special batching
 
@@ -29,29 +26,6 @@ class regionAgg_layer(nn.Module):
             #item: (num_parc, h*w)
             arr.append(torch.matmul(x[i].cuda(), torch.from_numpy(item).T.float().cuda()))
         return arr
-
-#def poisson_loss(outputs, targets):
-#   losses = []
-#    for output,target in zip(outputs,targets):
-#        poiss = dist.Poisson(output)
-#        losses.append( poiss.) 
-#    return loss
-
-class gaussAgg_layer(nn.Module):
-
-    def __init__(self):
-        super(gaussAgg_layer, self).__init__()
-
-    def forward(self, mean, var, parcel_mask_batch):
-        #x: (b, h*w)
-        #parcel_mask_batch: (b, num_parc, h*w)
-        means = []
-        vars = []
-        for i, item in enumerate(parcel_mask_batch):
-            #item: (num_parc, h*w)
-            means.append(torch.matmul(mean[i].cuda(), torch.from_numpy(item).T.float().cuda()))
-            vars.append(torch.matmul(var[i].cuda(), torch.from_numpy(item).T.float().cuda()))
-        return means, vars
 
 def gaussLoss(means, vars, targets):
     losses = []
@@ -95,11 +69,11 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
     torch.manual_seed(0)
     
     train_size = int( np.floor(len(this_dataset) * (1.0-cfg.train.validation_split-cfg.train.test_split) ) )
-    val_size = int( np.round( len(this_dataset) * cfg.train.validation_split ))
-    test_size = int(np.round( len(this_dataset) * cfg.train.test_split ))
+    val_size = int( np.floor( len(this_dataset) * cfg.train.validation_split ))
+    test_size = int(np.ceil( len(this_dataset) * cfg.train.test_split ))
 
 
-    print(len(this_dataset), len(this_dataset)*0.6, len(this_dataset)*0.2, test_size)
+    print(len(this_dataset), len(this_dataset)*0.8, len(this_dataset)*0.1, test_size)
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 

@@ -5,4 +5,5 @@ lightning_logs
 visualizations/*/*
 py36.yml
 results
+results_archived
 notebooks

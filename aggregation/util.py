@@ -77,6 +77,11 @@ def make_loaders( batch_size = cfg.train.batch_size, mode = cfg.mode, sample_mod
 
     train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(this_dataset, [train_size, val_size, test_size])
 
+    #make sure we use the full set for validation on combination experiments
+    if sample_mode == 'combine':
+        val_dataset.sample_mode = ''
+    if sample_mode == 'combine_uniform':
+        val_dataset.sample_mode = 'uniform'
 
     if(sample_mode == 'uniform' or sample_mode =='uniform_agg'or sample_mode =='combine_uniform'):
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=cfg.train.shuffle,

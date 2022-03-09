@@ -174,21 +174,24 @@ class RSampleModule(pl.LightningModule):
         image, parcel_masks, parcel_values = batch
 
         means, vars = self(image)
-
-
         gauss = dist.Normal(means, torch.sqrt(vars))
         sample = gauss.rsample()
         output = torch.flatten(sample, start_dim=1)
+
+        entropy = -torch.mean(gauss.entropy()) * torch.tensor(1e5)
+        mean_vars = torch.mean(vars)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
         estimated_values = self.agg(output, parcel_masks)
-        loss = util.MSE(estimated_values, parcel_values)
+        loss = util.MSE(estimated_values, parcel_values) + entropy
 
-        return {'loss': loss}
+        return {'loss': loss, 'entropy':entropy, 'mean_vars':mean_vars}
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
         self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        self.log('entropy', output['entropy'], on_epoch = True, batch_size=cfg.train.batch_size)
+        self.log('mean_vars', output['mean_vars'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
@@ -226,6 +229,7 @@ class GaussModule(pl.LightningModule):
         means = x[:,0]
         vars = x[:,1] 
         vars = self.softplus(vars)
+        vars = vars + 1e-16
         means = torch.flatten(means, start_dim=1)
         vars = torch.flatten(vars, start_dim=1)
         return means, vars
@@ -235,28 +239,37 @@ class GaussModule(pl.LightningModule):
         means = x[:,0]
         vars = x[:,1] 
         vars = self.softplus(vars)
-        return means, vars
+        return means.unsqueeze(1), vars.unsqueeze(1)
 
     def pred_Out(self, x, masks):
          means, vars = self(x)
          estimated_values = self.agg(means, masks)
          return estimated_values
 
-    def shared_step(self, batch):
+    def shared_step(self, batch): 
         image, parcel_masks, parcel_values = batch
 
         means, vars = self(image)
+
+        stds = torch.sqrt(vars)
+        gauss = dist.Normal(means, stds)
+
+        entropy = -torch.mean(gauss.entropy()) * torch.tensor(1e5)
+        mean_vars = torch.mean(vars)
+        #print(entropy)
         
         #take cnn output and parcel masks(Aggregation Matrix M)
         means= self.agg(means, parcel_masks)
         vars = self.agg(vars, parcel_masks)
 
-        loss = util.gaussLoss(means, vars, parcel_values)
-        return {'loss': loss}
+        loss = util.gaussLoss(means, vars, parcel_values) + entropy
+        return {'loss': loss, 'entropy':entropy, 'mean_vars':mean_vars}
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
         self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        self.log('entropy', output['entropy'], on_epoch = True, batch_size=cfg.train.batch_size)
+        self.log('mean_vars', output['mean_vars'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss'] 
 
     def validation_step(self, batch, batch_idx):

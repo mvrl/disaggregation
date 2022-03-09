@@ -32,8 +32,9 @@ def generate_images(model, num_images, dir_path):
         for sample in test_loader:
             image, masks, value = sample
 
-            if cfg.train.model == 'gauss' or 'rsample':
+            if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
                 vals, vars = model.get_valOut(image)
+                vars = vars.squeeze(0)
             else:
                 vals= model.get_valOut(image)   
                 vars=0 # NO STANDARD DEVIATIONS
@@ -90,7 +91,7 @@ def generate_images(model, num_images, dir_path):
             if not(os.path.exists(path)):
                 os.mkdir(path)
 
-            generate_plot(image.squeeze(0),vals.squeeze(0),vars.squeeze(0),pred_map,true_map, region_map,errors, path)
+            generate_plot(image.squeeze(0),vals.squeeze(0),vars,pred_map,true_map, region_map,errors, path)
             c+=1
             if c >= num_images:
                 return
@@ -156,7 +157,7 @@ def generate_scatter(model, dir_path):
 def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
 
     min_lim = 0
-    max_lim = 256
+    max_lim = 512
 
     #plt.set_title("Image")
     plt.imshow(image.permute(1,2,0)) 
@@ -195,20 +196,21 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
     plt.imshow(vals.permute(1,2,0) , cmap = 'Greens')
     plt.tight_layout(pad=0)
     plt.axis('off')
+    plt.colorbar()
     plt.xlim(min_lim, max_lim)
     plt.ylim(min_lim, max_lim)
     plt.savefig(os.path.join(path, "value_pred"), bbox_inches='tight', pad_inches=0)
     plt.close()
     #axs[0][1].set_title("Value Prediction")
 
-    if cfg.train.model == 'gauss' or 'rsample':
+    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
         plt.imshow(vars.permute(1,2,0), cmap = 'Reds')
         #plt.tight_layout(pad=0)
         plt.axis('off')
         plt.colorbar()
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars"))
+        plt.savefig(os.path.join(path, "vars"), bbox_inches='tight', pad_inches=0)
         plt.close()
 
         plt.imshow(vars.permute(1,2,0), cmap = 'Reds', norm=colors.LogNorm())
@@ -217,7 +219,7 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_log"))
+        plt.savefig(os.path.join(path, "vars_log"), bbox_inches='tight', pad_inches=0)
         plt.close()
         #axs[1][1].set_title("Variance")
 
@@ -227,7 +229,7 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_clipped"))
+        plt.savefig(os.path.join(path, "vars_clipped"), bbox_inches='tight', pad_inches=0)
         plt.close()
 
         color_map = plt.cm.get_cmap('Blues')
@@ -237,7 +239,7 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_reversed"))
+        plt.savefig(os.path.join(path, "vars_reversed"), bbox_inches='tight', pad_inches=0)
         plt.close()
 
         color_map = plt.cm.get_cmap('Blues')
@@ -247,7 +249,7 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_reversed_clipped"))
+        plt.savefig(os.path.join(path, "vars_reversed_clipped"), bbox_inches='tight', pad_inches=0)
         plt.close()
         #axs[1][1].set_title("Variance")
 
@@ -258,7 +260,7 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_reversed_lognorm"))
+        plt.savefig(os.path.join(path, "vars_reversed_lognorm"), bbox_inches='tight', pad_inches=0)
         plt.close()
         #axs[1][1].set_title("Variance")
 

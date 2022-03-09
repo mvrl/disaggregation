@@ -28,8 +28,7 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (512, 512)        # Used in visualizations
 
 
-cfg.experiment_name = 'rsample_final_1_pretrained'
-
+cfg.experiment_name = 'rsample_final_2_withREG'
 
 cfg.train = edict()
 cfg.mode = 'train'
@@ -37,13 +36,13 @@ cfg.train.model = 'rsample'
 
 cfg.train.use_pretrained = True
 
-cfg.train.patience = 25
+cfg.train.patience = 100
 
 cfg.train.validation_split = 0.1         # percentage validation
 cfg.train.test_split = 0.1               # percentage test
 cfg.train.batch_size = 8
 cfg.train.shuffle = True                 # shuffle training samples
-cfg.train.num_epochs = 250               # number of training epochs  ...
+cfg.train.num_epochs = 300              # number of training epochs  ...
 cfg.train.num_workers = 8                # workers for data loading
-cfg.train.device_ids = [0]               # Train on two GPUs? Set True for blackbird
+cfg.train.device_ids = [1]               # Train on two GPUs? Set True for blackbird
 

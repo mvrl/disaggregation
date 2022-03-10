@@ -16,7 +16,7 @@ def generate_pred_lists(model, dir_path):
 
     est_pth = os.path.join(dir_path, 'estimated.pkl')
     val_pth = os.path.join(dir_path, 'value.pkl')
-    pc_pth = os.path.join(dir_path, 'perchip.pkl')
+    pc_pth = os.path.join(dir_path, 'log.pkl')
 
     if (os.path.exists(est_pth)):
         with open(est_pth, "rb") as fp:\
@@ -24,11 +24,11 @@ def generate_pred_lists(model, dir_path):
         with open(val_pth, "rb") as fp:
             value_arr = pickle.load(fp)
         with open(pc_pth, "rb") as fp:
-            per_chip_errors = pickle.load(fp)
+            logs = pickle.load(fp)
     else:
         estimated_arr = []
         value_arr = []
-        per_chip_errors = []
+        logs = []
 
         print("Computing all predicted values...")
         with torch.no_grad():
@@ -37,26 +37,30 @@ def generate_pred_lists(model, dir_path):
 
                 estimated_values = model.pred_Out(image, mask)
 
+                if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
+                    log = model.log_out(image,mask,value)[0].cpu().numpy().tolist()
+                    #print(log)
+                    logs.extend(log)
+
                 estimated_arr.extend( estimated_values[0].cpu().numpy().tolist())
                 value_arr.extend(value[0].numpy().tolist())
 
-                per_chip_error = estimated_values[0].cpu().numpy().sum() - value[0].numpy().sum()
-                per_chip_errors.append(per_chip_error)
+                
 
     with open(est_pth, "wb") as fp:   #Pickling
         pickle.dump(estimated_arr, fp)
     with open(val_pth, "wb") as fp:   #Pickling
         pickle.dump(value_arr, fp)
     with open(pc_pth, "wb") as fp:   #Pickling
-        pickle.dump(per_chip_errors, fp)
+        pickle.dump(logs, fp)
 
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
     relative_error = mae_errors / np.array(value_arr)
     mse_errors = np.array(value_arr) - np.array(estimated_arr)
     mse_errors = np.power(mse_errors,2)
-    per_chip_error = np.abs(np.array(per_chip_errors)).mean()
+    log_error= np.abs(np.array(logs)).mean()
 
-    return mae_errors.mean(), mse_errors.mean(), per_chip_error, relative_error.mean()*100
+    return mae_errors.mean(), mse_errors.mean(), log_error, relative_error.mean()*100
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
     model =train.chooseModel(model_name)
@@ -74,8 +78,8 @@ if __name__ == '__main__':
 
     model = loadModel(ckpt_path , cfg.train.model)
 
-    mae_error, mse_error, per_chip_error, percent_error = generate_pred_lists(model, dir_path)
+    mae_error, mse_error, log_error, percent_error = generate_pred_lists(model, dir_path)
 
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nPer Chip MAE: "+ str(per_chip_error), "\nAvg Percent Error: "+ str(percent_error)  ]
+    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nAverage Log Prob: "+ str(log_error), "\nAvg Percent Error: "+ str(percent_error)  ]
     test_file.writelines(L)

@@ -17,6 +17,19 @@ from dataset import Eurosat
 
 from unet import UNet
 
+from shutil import copyfile
+import os
+
+
+
+def MSE(outputs, targets):
+    losses = []
+    for output,target in zip(outputs,targets):
+        losses.append( torch.sum((output - target)**2) )
+    loss = torch.stack(losses, dim=0).mean()
+    return loss
+
+
 def gaussLoss(means, vari, targets):
     losses = []
     for mean,var,target in zip(means,vari,targets):
@@ -51,21 +64,29 @@ class regionize_gauss(pl.LightningModule):
 
         var = self.softplus(var)
 
-        agg_mean = self.avg_pool(mean) * self.hparams.kernel_size**2
-        agg_var = self.avg_pool(var) * self.hparams.kernel_size**2
+        if (self.hparams.method == "analytical"):
+            agg_mean = self.avg_pool(mean)# * self.hparams.kernel_size**2
+            agg_var = self.avg_pool(var)# * self.hparams.kernel_size**2
 
-        agg_mean = self.flatten(agg_mean)
-        agg_var = self.flatten(agg_var)
+            agg_mean = self.flatten(agg_mean)
+            agg_var = self.flatten(agg_var)
         
-        
-        return  agg_mean, agg_var
-               
+            return  agg_mean, agg_var
+
+        else:   
+            return mean, var
+
     
     def pred_Out(self, x):
-        
-        means, _ = self (x)
-        
+       
+        means, _  = self(x)
+
+        if (self.hparams.method == "rsample"):
+            means = self.avg_pool(mean)
+            means = self.flatten(agg_mean)
+
         return means
+        
     
 
     def log_out(self, x, targets):
@@ -81,7 +102,7 @@ class regionize_gauss(pl.LightningModule):
     
     def agg_labels(self, labels):
         
-        labels = self.avg_pool(labels) * self.hparams.kernel_size**2
+        labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
         agg_labels = self.flatten(labels)
         
         return agg_labels
@@ -92,17 +113,37 @@ class regionize_gauss(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
         
-        agg_labels = self.avg_pool(labels) * self.hparams.kernel_size**2
-        agg_labels = self.flatten(agg_labels)
+        
+        if (self.hparams.method == "analytical" or self.hparams.method == "rsample"):
+            agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
+            labels = self.flatten(agg_labels)
         
         
+        if (self.hparams.method == "interpolate"):
+            agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
+            labels = torch.nn.functional.interpolate(agg_labels.unsqueeze(1), size=(64,64), mode='bicubic')
+
+        
+        if (self.hparams.method == "full res"):
+            labels = labels
+
         means, var = self (images)
 
-        print (means, "means")
-        print (var, "var")
-        print (agg_labels, "labels")
-        
-        loss = gaussLoss(means, var, agg_labels)
+        if (self.hparams.method == "rsample"):
+            
+            gauss_dist = dist.Normal(means, torch.sqrt(var))
+            sample = gauss_dist.rsample()
+
+            entropy = -torch.mean(gauss_dist.entropy())
+            mean_var = torch.mean(var)
+
+            est = self.avg_pool(sample)
+            est = self.flatten(est)
+         
+        if (self.hparams.method == "rsample"):
+            loss = MSE(est, labels) + entropy
+        else:
+            loss = gaussLoss(means, var, labels)
                 
         return {'loss': loss}
     
@@ -147,9 +188,10 @@ def main(args):
     if type(args)==dict:
             args = Namespace(**args)
     
-
-    log_dir = '{}'.format(
+    method = args.method
+    log_dir = '{}/{}'.format(
         args.save_dir,
+        args.method,
         )
 
     logger = TensorBoardLogger(log_dir)
@@ -161,30 +203,30 @@ def main(args):
     
     early_stopping = EarlyStopping('val_loss', patience=args.patience)
 
+    best_path = checkpoint_callback.best_model_path
+    
     trainer = pl.Trainer.from_argparse_args(args,
                                             max_epochs = args.max_epochs,
                                             logger=logger, 
                                             callbacks=[checkpoint_callback, early_stopping],
                                             )
     trainer.fit(model)    
+    print ("best path is saved in ", best_path)
     
 if __name__ == '__main__':
     from argparse import ArgumentParser, Namespace 
     
     parser = ArgumentParser()
     
-    parser.add_argument('--max_epochs', type=int, default=100)
+    parser.add_argument('--max_epochs', type=int, default=150)
     parser.add_argument('--workers', type=int, default=8)
-    parser.add_argument('--batch_size', type=int, default=4)
-    parser.add_argument('--step_size', type=int, default=40)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--learning_rate', type=float, default=.0001)
     parser.add_argument('--save_dir', default='logs')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--drop_rate', type=float, default=.1)
     parser.add_argument('--kernel_size', type=int, default=16)
     parser.add_argument('--patience', type=int, default=100)
-    parser.add_argument('--num_regions', type=int, default=10)
                          
-    
+    parser.add_argument('--method', type=str, default='analytical')
     args = parser.parse_args() 
     main(args)

@@ -82,8 +82,8 @@ class regionize_gauss(pl.LightningModule):
         means, _  = self(x)
 
         if (self.hparams.method == "rsample"):
-            means = self.avg_pool(mean)
-            means = self.flatten(agg_mean)
+            means = self.avg_pool(means)
+            means = self.flatten(means)
 
         return means
         
@@ -129,7 +129,7 @@ class regionize_gauss(pl.LightningModule):
 
         means, var = self (images)
 
-        if (self.hparams.method == "rsample"):
+        if (self.hparams.method == "rsample" or self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
             
             gauss_dist = dist.Normal(means, torch.sqrt(var))
             sample = gauss_dist.rsample()
@@ -137,20 +137,26 @@ class regionize_gauss(pl.LightningModule):
             entropy = -torch.mean(gauss_dist.entropy())
             mean_var = torch.mean(var)
 
+        if (self.hparams.method == "rsample"):
             est = self.avg_pool(sample)
             est = self.flatten(est)
-         
-        if (self.hparams.method == "rsample"):
             loss = MSE(est, labels) + entropy
+
+        elif (self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
+            loss = MSE(sample, labels) + entropy
         else:
             loss = gaussLoss(means, var, labels)
-                
-        return {'loss': loss}
+        
+        if (self.hparams.method =="analytical"):
+            entropy = 0
+        return {'loss': loss, 'entropy': entropy}
     
     def training_step(self, batch, batch_idx):
         
         output = self.shared_step(batch)
         self.log('train_loss', output['loss'],  
+                on_epoch = True, batch_size=self.hparams.batch_size)
+        self.log('entropy', output['entropy'],  
                 on_epoch = True, batch_size=self.hparams.batch_size)
         return output['loss']
     
@@ -189,9 +195,10 @@ def main(args):
             args = Namespace(**args)
     
     method = args.method
-    log_dir = '{}/{}'.format(
+    log_dir = '{}/{}/{}'.format(
         args.save_dir,
         args.method,
+        args.kernel_size
         )
 
     logger = TensorBoardLogger(log_dir)

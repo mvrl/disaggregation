@@ -38,11 +38,13 @@ def generate_pred_lists(model, dir_path, method):
                 value_arr.extend(labels[0].cpu().numpy().tolist())
 
                 
-
+                log = model.log_out(images,labels)[0].cpu().numpy().tolist()
+                logs.extend(log)
 
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
+    log_error= np.abs(np.array(logs)).mean()
 
-    return mae_errors.mean()
+    return mae_errors.mean(), log_error
 
 def main(args):
 
@@ -52,17 +54,19 @@ def main(args):
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
     #use the desired check point path
-    ckpt_path = os.path.join(dir_path, 'logs/rsample/default/version_0/checkpoints/last.ckpt')
+    ckpt_path = os.path.join(dir_path, 'logs/rsample/16/default/version_0/checkpoints/last.ckpt')
     torch.cuda.set_device(1)
     
 
     model = train.regionize_gauss(hparams = args)
     model = model.load_from_checkpoint(ckpt_path, 
         use_pretrained=False)
-    mae_error = generate_pred_lists(model, dir_path, args.method)
+    mae_error,log_error = generate_pred_lists(model, dir_path, args.method)
     
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats for: "+str(args.method), "\nMAE: "+ str(mae_error)   ]
+    L = ["\nTest Stats for: "+str(args.method), "\nMAE: "+ str(mae_error),
+            "\nAverage Log Prob: "+ str(log_error)   ]
+
     test_file.writelines(L)
 
 if __name__ == '__main__':

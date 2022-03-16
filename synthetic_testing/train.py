@@ -84,7 +84,7 @@ class regionize_gauss(pl.LightningModule):
         for mean,var,target in zip(means,vari, targets):
             std = torch.sqrt(var)
             gauss = dist.Normal(mean, std)
-            losses.append(torch.exp(gauss.log_prob(target)))
+            losses.append(gauss.log_prob(target))
         return losses
     
     def agg_labels(self, labels):

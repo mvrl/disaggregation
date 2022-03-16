@@ -64,26 +64,13 @@ class regionize_gauss(pl.LightningModule):
 
         var = self.softplus(var)
 
-        if (self.hparams.method == "analytical"):
-            agg_mean = self.avg_pool(mean)# * self.hparams.kernel_size**2
-            agg_var = self.avg_pool(var)# * self.hparams.kernel_size**2
 
-            agg_mean = self.flatten(agg_mean)
-            agg_var = self.flatten(agg_var)
-        
-            return  agg_mean, agg_var
+        return mean, var
 
-        else:   
-            return mean, var
 
-    
     def pred_Out(self, x):
        
         means, _  = self(x)
-
-        if (self.hparams.method == "rsample"):
-            means = self.avg_pool(means)
-            means = self.flatten(means)
 
         return means
         
@@ -113,7 +100,7 @@ class regionize_gauss(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
         
-        
+            
         if (self.hparams.method == "analytical" or self.hparams.method == "rsample"):
             agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
             labels = self.flatten(agg_labels)
@@ -129,6 +116,14 @@ class regionize_gauss(pl.LightningModule):
 
         means, var = self (images)
 
+        if (self.hparams.method == "analytical"):
+            agg_mean = self.avg_pool(means)# * self.hparams.kernel_size**2
+            agg_var = self.avg_pool(var)# * self.hparams.kernel_size**2
+
+            means = self.flatten(agg_mean)
+            var = self.flatten(agg_var)
+        
+        
         if (self.hparams.method == "rsample" or self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
             
             gauss_dist = dist.Normal(means, torch.sqrt(var))

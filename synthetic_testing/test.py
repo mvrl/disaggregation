@@ -29,9 +29,6 @@ def generate_pred_lists(model, dir_path, method):
                 images = sample['image']
                 labels = sample['label']
 
-                if (method == "analytical" or method == "rsample"):
-
-                    labels = model.agg_labels(labels)
                 
                 estimated_values = model.pred_Out(images)
                 
@@ -55,7 +52,7 @@ def main(args):
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
     #use the desired check point path
-    ckpt_path = os.path.join(dir_path, 'logs/full_res/8/default/version_0/checkpoints/last.ckpt')
+    ckpt_path = os.path.join(dir_path, 'logs/rsample/default/version_0/checkpoints/last.ckpt')
     torch.cuda.set_device(1)
     
 

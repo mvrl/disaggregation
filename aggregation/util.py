@@ -35,7 +35,7 @@ def gaussLoss(means, vars, targets):
     for mean,var,target in zip(means,vars,targets):
         std = torch.sqrt(var)
         gauss = dist.Normal(mean, std)
-        #print(gauss)
+        print(gauss)
         #print(gauss.log_prob(target))
         losses.append(-torch.sum(gauss.log_prob(target)))
     loss = torch.stack(losses, dim=0).mean()

@@ -19,7 +19,7 @@ def generate_pred_lists(model, dir_path):
     pc_pth = os.path.join(dir_path, 'log.pkl')
 
     if (os.path.exists(est_pth)):
-        with open(est_pth, "rb") as fp:\
+        with open(est_pth, "rb") as fp:
             estimated_arr = pickle.load(fp)
         with open(val_pth, "rb") as fp:
             value_arr = pickle.load(fp)
@@ -44,9 +44,7 @@ def generate_pred_lists(model, dir_path):
 
                 estimated_arr.extend( estimated_values[0].cpu().numpy().tolist())
                 value_arr.extend(value[0].numpy().tolist())
-
                 
-
     with open(est_pth, "wb") as fp:   #Pickling
         pickle.dump(estimated_arr, fp)
     with open(val_pth, "wb") as fp:   #Pickling
@@ -58,9 +56,14 @@ def generate_pred_lists(model, dir_path):
     relative_error = mae_errors / np.array(value_arr)
     mse_errors = np.array(value_arr) - np.array(estimated_arr)
     mse_errors = np.power(mse_errors,2)
-    log_error= np.abs(np.array(logs)).mean()
 
-    return mae_errors.mean(), mse_errors.mean(), log_error, relative_error.mean()*100
+    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
+        log_error= np.array(logs)
+        log_error = np.abs(log_error)
+    else:
+        log_error= 0
+
+    return mae_errors.mean(), mse_errors.mean(), np.mean(log_error), relative_error.mean()*100
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
     model =train.chooseModel(model_name)

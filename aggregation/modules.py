@@ -170,7 +170,8 @@ class RSampleModule(pl.LightningModule):
         estimated_values = self.agg(output, masks)
         return estimated_values
 
-    def log_out(self, x, masks, targets):
+    #more like cdf out
+    def log_out(self, x, masks, targets, number):
         means, vars = self(x)
         means = torch.flatten(means, start_dim=1)
         vars = torch.flatten(vars, start_dim=1)
@@ -181,7 +182,15 @@ class RSampleModule(pl.LightningModule):
         for mean,var,target in zip(means,vars, targets):
             std = torch.sqrt(var)
             gauss = dist.Normal(mean, std)
-            losses.append(torch.exp(gauss.log_prob(target.cuda())))
+            #zscore = (target.cuda() - mean)/std
+            #print(zscore)
+            #gauss = dist.Normal(torch.tensor(310592.1445), torch.tensor(112758.4427))
+
+            val = torch.tensor(number).cuda()
+
+            metric = gauss.cdf(target.cuda() + val) - gauss.cdf(target.cuda() - val)
+            losses.append(metric)
+            
         return losses
 
     def shared_step(self, batch):
@@ -260,7 +269,7 @@ class GaussModule(pl.LightningModule):
          estimated_values = self.agg(means, masks)
          return estimated_values
 
-    def log_out(self, x, masks, targets):
+    def log_out(self, x, masks, targets, number):
         means, vars = self(x)
         means= self.agg(means, masks)
         vars = self.agg(vars, masks)
@@ -269,7 +278,11 @@ class GaussModule(pl.LightningModule):
         for mean,var,target in zip(means,vars, targets):
             std = torch.sqrt(var)
             gauss = dist.Normal(mean, std)
-            losses.append(torch.exp(gauss.log_prob(target.cuda())))
+            
+            val = torch.tensor(number).cuda()
+
+            metric = gauss.cdf(target.cuda() + val) - gauss.cdf(target.cuda() - val)
+            losses.append(metric)
         return losses
 
 

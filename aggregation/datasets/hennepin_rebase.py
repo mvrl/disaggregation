@@ -44,9 +44,9 @@ class dataset_hennepin_rebase(Dataset):        # derived from 'dataset_SkyFinder
         img_path =  os.path.join(self.img_dir,str(idx)+".jpg")
         mask_path =  os.path.join(self.mask_dir,str(idx)+".pkl")
 
-        if self.mode == 'train':
+        #if self.mode == 'train':
             #APPLY TRANSFORMS
-            print("transforms on")
+            #print("transforms on")
 
         img = Image.open(img_path)
 
@@ -76,7 +76,9 @@ class dataset_hennepin_rebase(Dataset):        # derived from 'dataset_SkyFinder
         if random.random() > 0.5:
                 img = transforms_function.vflip(img)
                 masks = transforms_function.vflip(masks)
-        
+
+        #if self.sample_mode == 'uniform':
+        # Then use the masks and values to create a uniform label and return it
 
         return img, masks, self.vals[idx]
 

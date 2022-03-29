@@ -25,14 +25,14 @@ cfg.data.hennepin.root_dir = '/u/eag-d1/data/Hennepin/new_area_large/' #512x512 
 cfg.data.hennepin.sample_mode = ''
 
 
-cfg.data.cutout_size = (512, 512)        # Used in visualizations
+cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'combine_ral_final_fixed2'
+cfg.experiment_name = 'testing_rebase_rsample'
 
 cfg.train = edict()
 cfg.mode = 'train'
-cfg.train.model = 'ral'
+cfg.train.model = 'rsample'
 
 cfg.train.use_pretrained = True
 

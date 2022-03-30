@@ -156,10 +156,13 @@ class RSampleModule(pl.LightningModule):
         means, vars = self(image)
         gauss = dist.Normal(means, torch.sqrt(vars))
         sample = gauss.rsample()
-        output = torch.flatten(sample, start_dim=1)
+        output = torch.flatten(sample, start_dim=1).unsqueeze(1)
 
         masks = torch.flatten(masks,start_dim = 2)
         masks = torch.swapdims(masks,2,1)
+
+        print(output.shape)
+        print(masks.shape)
     
         region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
 
@@ -206,7 +209,6 @@ class GaussModule(pl.LightningModule):
             self.unet.load_state_dict(model_state)
         
         self.softplus = nn.Softplus()
-        self.agg = util.regionAgg_layer()
 
     def forward(self, x):
         x = self.unet(x)
@@ -222,23 +224,32 @@ class GaussModule(pl.LightningModule):
         image, masks, values = batch
 
         means, vars = self(image)
+        mean_vars = torch.mean(vars)
         
         masks = torch.flatten(masks,start_dim = 2)
         masks = torch.swapdims(masks,2,1)
     
-        means_sums = torch.matmul(means.float(), masks.float()).squeeze(1)
-        variances_sums =  torch.matmul(vars.float(), masks.float()).squeeze(1)
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        variances_sums =  torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        squares = torch.square(values.float()-means_sums)
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        variances_sums = variances_sums[indices]
+        values = values[indices]
 
         stds_sums = torch.sqrt(variances_sums)
         gauss = dist.Normal(means_sums, stds_sums)
         
-        loss =  -torch.sum(gauss.log_prob(values))
+        loss =  -torch.sum(gauss.log_prob(values)) + torch.sum(squares, dim=1).mean() * torch.tensor(1e-3)
 
-        return {'loss': loss}
+        return {'loss': loss, 'mean_vars': mean_vars}
 
     def training_step(self, batch, batch_idx):
         output = self.shared_step(batch)
         self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        self.log('mean_vars', output['mean_vars'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss'] 
 
     def validation_step(self, batch, batch_idx):

@@ -14,8 +14,7 @@ import torch
 
 from PIL import Image
 
-#Idea we are going to reduce back to 312 so we can get more managable tensors. 
-class dataset_hennepin_rebase(Dataset):        # derived from 'dataset_SkyFinder_multi_clean', applies random crop
+class dataset_hennepin_rebase(Dataset):        
     def __init__(self, mode, sample_mode):
 
         self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1/'
@@ -30,7 +29,7 @@ class dataset_hennepin_rebase(Dataset):        # derived from 'dataset_SkyFinder
         #Image Transformations
         self.transform = transforms.Compose([
             transforms.ToTensor(),
-            #transforms.Normalize(mean=[0.4712904,0.36086863,0.27999857], std=[0.24120754, 0.2294313, 0.21295355])
+            transforms.Normalize(mean=[0.4712904,0.36086863,0.27999857], std=[0.24120754, 0.2294313, 0.21295355])
         ])
 
         if os.path.exists(self.val_pkl):
@@ -59,23 +58,25 @@ class dataset_hennepin_rebase(Dataset):        # derived from 'dataset_SkyFinder
         vals = self.vals[idx]
         vals = torch.tensor(vals)
         masks = torch.tensor(masks)
-        #img = torch.tensor(img)
 
-        #Data Augmentations
-        img = self.transform(img)
+        if(self.mode == 'train'):
+            #Data Augmentations
+            img = self.transform(img)
 
-        #random flipping
-        rotate_param = np.random.randint(1,5)
-        img = transforms_function.rotate(img, 90*rotate_param, transforms.InterpolationMode.BILINEAR)
-        masks = transforms_function.rotate(masks, 90*rotate_param, transforms.InterpolationMode.BILINEAR)
+            #random flipping
+            rotate_param = np.random.randint(1,5)
+            img = transforms_function.rotate(img, 90*rotate_param, transforms.InterpolationMode.BILINEAR)
+            masks = transforms_function.rotate(masks, 90*rotate_param, transforms.InterpolationMode.BILINEAR)
 
-        if random.random() > 0.5:
-                img = transforms_function.hflip(img)
-                masks = transforms_function.hflip(masks)
-                
-        if random.random() > 0.5:
-                img = transforms_function.vflip(img)
-                masks = transforms_function.vflip(masks)
+            if random.random() > 0.5:
+                    img = transforms_function.hflip(img)
+                    masks = transforms_function.hflip(masks)
+                    
+            if random.random() > 0.5:
+                    img = transforms_function.vflip(img)
+                    masks = transforms_function.vflip(masks)
+        else:
+            img = torch.tensor(img)
 
         #if self.sample_mode == 'uniform':
         # Then use the masks and values to create a uniform label and return it

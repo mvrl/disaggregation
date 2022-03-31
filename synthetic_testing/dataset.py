@@ -49,8 +49,8 @@ class Eurosat(torch.utils.data.Dataset):
         image = transformed['image']
         image = torch.tensor(image).permute(2, 0, 1)
         
-        image = image[[3,2,1],:,:]
         label = image[7,:, :]
+        image = image[[3,2,1],:,:]
         
         label = (label - torch.mean(label)) / torch.std(label)
         

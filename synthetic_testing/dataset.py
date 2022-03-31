@@ -14,11 +14,11 @@ import torch
 class Eurosat(torch.utils.data.Dataset):
    
     
-    def __init__(self, mode='train', root='/localdisk0/SCRATCH/watch/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif/'):
+    def __init__(self, mode='train', root='/u/amo-d0/grad/aan244/disagg/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif/'):
         data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
 
         if mode == 'train':
-            train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
+            train_set, _ = train_test_split(data, test_size=0.2, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
                A.HorizontalFlip(p=0.5),
@@ -26,7 +26,7 @@ class Eurosat(torch.utils.data.Dataset):
             ],
             )
         elif mode == 'test' or mode == 'validation':
-            _, val_set = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
+            _, val_set = train_test_split(data, test_size=0.2, stratify=data.targets, random_state=42)
             self.dset = val_set
             self.transform = A.Compose([
                A.NoOp()
@@ -36,7 +36,7 @@ class Eurosat(torch.utils.data.Dataset):
     def im_loader(self, path):
    
         image = np.asarray((io.imread(path)), dtype='float32')
-        image = (image - image.min()) / (image.max()-image.min())
+       # image = (image - image.min()) / (image.max()-image.min())
         return image
 
     def __len__(self):
@@ -48,7 +48,17 @@ class Eurosat(torch.utils.data.Dataset):
         transformed = self.transform(image=item[0])
         image = transformed['image']
         image = torch.tensor(image).permute(2, 0, 1)
-        label = item[0][:,:, 7]
-        image = image[[3,2,1], :,:]
+        
+        image = image[[3,2,1],:,:]
+        label = image[7,:, :]
+        
+        label = (label - torch.mean(label)) / torch.std(label)
+        
+        norm_image =[]
+        for i in range(image.shape[0]):
+            norm_image.append(np.array((image[i,:,:]-image[i,:,:].mean())/(image[i,:,:].std())).tolist())
+
+        image = torch.tensor(norm_image)
         
         return {'image': image, 'label': label}
+

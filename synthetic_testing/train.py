@@ -26,6 +26,9 @@ def MSE(outputs, targets):
     losses = []
     for output,target in zip(outputs,targets):
         losses.append( torch.sum((output - target)**2) )
+       # print (output, "output")
+       # print(target, "target")
+       # print (losses)
     loss = torch.stack(losses, dim=0).mean()
     return loss
 
@@ -61,8 +64,8 @@ class regionize_gauss(pl.LightningModule):
 
         mean = x[:, 0]
         var = x[:, 1]
-
-        var = self.softplus(var)
+        var = self.softplus(var*-0.1+0.5)
+        print (var, "var")
 
 
         return mean, var
@@ -70,22 +73,23 @@ class regionize_gauss(pl.LightningModule):
 
     def pred_Out(self, x):
        
-        means, _  = self(x)
+        means, var  = self(x)
 
-        return means
+        return means, var
         
     
 
     def log_out(self, x, targets):
         
         means, vari = self(x)
-
+        
         losses=[]
         for mean,var,target in zip(means,vari, targets):
             std = torch.sqrt(var)
             gauss = dist.Normal(mean, std)
-            losses.append(gauss.log_prob(target))
-        return losses
+            print( mean, std, target, gauss.log_prob(target) )
+            losses.append(np.array(gauss.log_prob(target).detach().cpu()).tolist())
+        return torch.tensor(losses).mean()
     
     def agg_labels(self, labels):
         
@@ -100,7 +104,8 @@ class regionize_gauss(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
         
-            
+        log_out = self.log_out(images, labels)
+
         if (self.hparams.method == "analytical" or self.hparams.method == "rsample"):
             agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
             labels = self.flatten(agg_labels)
@@ -115,36 +120,49 @@ class regionize_gauss(pl.LightningModule):
             labels = labels
 
         means, var = self (images)
-
+        print (means, "means")
+        print (var, "var")
+        print (labels, "labels")
         if (self.hparams.method == "analytical"):
             agg_mean = self.avg_pool(means)# * self.hparams.kernel_size**2
             agg_var = self.avg_pool(var)# * self.hparams.kernel_size**2
 
             means = self.flatten(agg_mean)
             var = self.flatten(agg_var)
+             
         
-        
-        if (self.hparams.method == "rsample" or self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
+        if ( self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
             
             gauss_dist = dist.Normal(means, torch.sqrt(var))
             sample = gauss_dist.rsample()
 
-            entropy = -torch.mean(gauss_dist.entropy())
+            entropy =  -torch.mean(gauss_dist.entropy())
             mean_var = torch.mean(var)
 
         if (self.hparams.method == "rsample"):
-            est = self.avg_pool(sample)
+            
+            est = self.avg_pool(means)
             est = self.flatten(est)
-            loss = MSE(est, labels) + entropy
+            var = self.avg_pool(var)
+            var = self.flatten(var)
+
+            gauss_dist = dist.Normal(est, torch.sqrt(var))
+            sample = gauss_dist.rsample()
+
+            entropy =  -torch.mean(gauss_dist.entropy())
+            loss = MSE(sample, labels) + entropy*torch.tensor(1e3)
 
         elif (self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
-            loss = MSE(sample, labels) + entropy
+            loss = MSE(sample, labels) + entropy* torch.tensor(1e3)
+            print(loss, "loss")
         else:
+         #   print (means,var, "meanvar")
             loss = gaussLoss(means, var, labels)
         
         if (self.hparams.method =="analytical"):
             entropy = 0
-        return {'loss': loss, 'entropy': entropy}
+
+        return {'loss': loss, 'entropy': entropy, 'log_out': log_out}
     
     def training_step(self, batch, batch_idx):
         
@@ -152,6 +170,8 @@ class regionize_gauss(pl.LightningModule):
         self.log('train_loss', output['loss'],  
                 on_epoch = True, batch_size=self.hparams.batch_size)
         self.log('entropy', output['entropy'],  
+                on_epoch = True, batch_size=self.hparams.batch_size)
+        self.log('log_prob', output['log_out'],
                 on_epoch = True, batch_size=self.hparams.batch_size)
         return output['loss']
     
@@ -222,9 +242,9 @@ if __name__ == '__main__':
     
     parser.add_argument('--max_epochs', type=int, default=150)
     parser.add_argument('--workers', type=int, default=8)
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--learning_rate', type=float, default=.0001)
-    parser.add_argument('--save_dir', default='logs')
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--learning_rate', type=float, default=.01)
+    parser.add_argument('--save_dir', default='new_logs')
     parser.add_argument('--gpus', type=int, default=1)
     parser.add_argument('--kernel_size', type=int, default=16)
     parser.add_argument('--patience', type=int, default=100)

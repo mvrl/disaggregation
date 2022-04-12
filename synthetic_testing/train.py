@@ -39,9 +39,8 @@ def gaussLoss_a(mean, var, target):
     loss = torch.mean(loss)
     return loss
 
-def gaussLoss(mean, var, targets):
+def gaussLoss(mean, std, targets):
    
-    std = torch.sqrt(var)
     gauss = dist.Normal(mean, std)
     log_prob = gauss.log_prob(targets)
     loss = -(torch.mean(log_prob))
@@ -157,10 +156,9 @@ class regionize_gauss(pl.LightningModule):
        #     print (labels.shape) 
             mean_d = torch.mean (est, 0)
             std_d = torch.std (est, 0)
-            var_d = std_d**2
             
          #   print (mean_d.shape, std_d.shape, labels.shape)
-            loss = gaussLoss(mean_d, var_d, labels) + self.hparams.lambdaa*entropy
+            loss = gaussLoss(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
            # loss = MSE(est, labels) + self.hparams.lambdaa*entropy
 
         elif (self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
@@ -171,8 +169,7 @@ class regionize_gauss(pl.LightningModule):
             std_d = torch.std (est, 0)
 
         #    print (mean_d.shape, std_d.shape, labels.shape)
-            var_d = std_d**2
-            loss = gaussLoss(mean_d, var_d, labels) + self.hparams.lambdaa*entropy
+            loss = gaussLoss(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
 
            # loss = MSE(sample, labels) +1e3* kl(sample, dist.Normal(torch.zeros(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")
            #     ,torch.ones(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")).rsample()) 

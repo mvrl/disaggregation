@@ -9,7 +9,7 @@ from datasets import hennepin_rebase
 import torch.distributions as dist
 
 
-def make_dataset(mode, sample_mode = ''):
+def make_dataset(mode, sample_mode = cfg.data.hennepin.sample_mode):
     if cfg.data.name == 'hennepin':
         this_dataset = hennepin_rebase.dataset_hennepin_rebase(mode, sample_mode)
     return this_dataset

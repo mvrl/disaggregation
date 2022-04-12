@@ -1,3 +1,4 @@
+from asyncio.unix_events import BaseChildWatcher
 from numpy.core.numeric import indices
 import util
 import torch
@@ -17,6 +18,7 @@ def generate_pred_lists(model, dir_path):
     est_pth = os.path.join(dir_path, 'estimated.pkl')
     val_pth = os.path.join(dir_path, 'value.pkl')
     pc_pth = os.path.join(dir_path, 'log.pkl')
+    metric_pth = os.path.join(dir_path, 'metric.pkl')
 
     if (os.path.exists(est_pth)):
         with open(est_pth, "rb") as fp:
@@ -25,25 +27,31 @@ def generate_pred_lists(model, dir_path):
             value_arr = pickle.load(fp)
         with open(pc_pth, "rb") as fp:
             logs = pickle.load(fp)
+        with open(metric_pth, "rb") as fp:
+            metrics = pickle.load(fp)
     else:
         estimated_arr = []
         value_arr = []
         logs = []
+        metrics = []
 
         print("Computing all predicted values...")
         with torch.no_grad():
-            for sample in tqdm(test_loader):
-                image, mask, value = sample
+            for batch in tqdm(test_loader):
 
-                estimated_values = model.pred_Out(image, mask)
+                estimated_values, true_values = model.value_predictions(batch)
+                #print(estimated_values.shape)
 
                 if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
-                    log = model.log_out(image,mask,value)[0].cpu().numpy().tolist()
-                    #print(log)
-                    logs.extend(log)
 
-                estimated_arr.extend( estimated_values[0].cpu().numpy().tolist())
-                value_arr.extend(value[0].numpy().tolist())
+                    interval_val = torch.tensor(10000)
+                    log, metric = model.prob_eval(batch,interval_val)
+
+                    logs.extend(log.cpu().numpy().tolist())
+                    metrics.extend(metric.cpu().numpy().tolist())
+
+                estimated_arr.extend( estimated_values.cpu().numpy().tolist())
+                value_arr.extend(true_values.numpy().tolist())
                 
     with open(est_pth, "wb") as fp:   #Pickling
         pickle.dump(estimated_arr, fp)
@@ -51,6 +59,8 @@ def generate_pred_lists(model, dir_path):
         pickle.dump(value_arr, fp)
     with open(pc_pth, "wb") as fp:   #Pickling
         pickle.dump(logs, fp)
+    with open(metric_pth, "wb") as fp:   #Pickling
+        pickle.dump(metrics, fp)
 
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
     relative_error = mae_errors / np.array(value_arr)
@@ -58,12 +68,13 @@ def generate_pred_lists(model, dir_path):
     mse_errors = np.power(mse_errors,2)
 
     if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
-        log_error= np.array(logs)
-        log_error = np.abs(log_error)
+        logs= np.array(logs)
+        metrics = np.array(metrics)
     else:
-        log_error= 0
+        logs= 0
+        metrics = 0
 
-    return mae_errors.mean(), mse_errors.mean(), np.mean(log_error), relative_error.mean()*100
+    return mae_errors.mean(), mse_errors.mean(), np.mean(logs), relative_error.mean()*100, np.mean(metrics)
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
     model =train.chooseModel(model_name)
@@ -81,8 +92,8 @@ if __name__ == '__main__':
 
     model = loadModel(ckpt_path , cfg.train.model)
 
-    mae_error, mse_error, log_error, percent_error = generate_pred_lists(model, dir_path)
+    mae_error, mse_error, log_error, percent_error, metric_mean = generate_pred_lists(model, dir_path)
 
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nAverage Log Prob: "+ str(log_error), "\nAvg Percent Error: "+ str(percent_error)  ]
+    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nAvg Percent Error: "+ str(percent_error), "\nAverage Log Prob: "+ str(log_error), "\nAverage Metric 10,0000 Probability: "+ str(metric_mean) ]
     test_file.writelines(L)

@@ -27,6 +27,8 @@ def chooseModel(model_name = cfg.train.model):
         model = modules.RSampleModule(use_pretrained=cfg.train.use_pretrained)
     if(model_name == 'gauss'):
         model = modules.GaussModule(use_pretrained=cfg.train.use_pretrained)
+    if(model_name == 'batch'):
+        model = modules.BatchwiseMeanModule(use_pretrained=cfg.train.use_pretrained)
     return model
 
 if __name__ == '__main__':

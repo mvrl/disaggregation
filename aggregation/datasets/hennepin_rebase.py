@@ -76,12 +76,32 @@ class dataset_hennepin_rebase(Dataset):
                     img = transforms_function.vflip(img)
                     masks = transforms_function.vflip(masks)
         else:
-            img = torch.tensor(img)
+            from_pil_transform = transforms.ToTensor()
+            img = from_pil_transform(img)
 
-        #if self.sample_mode == 'uniform':
-        # Then use the masks and values to create a uniform label and return it
+        parcel_values = self.vals[idx]
 
-        return img, masks, self.vals[idx]
+        if(self.sample_mode == 'uniform'):
+            uniform_value_map = np.zeros_like(masks[0])
+            total_parcel_mask = np.zeros_like(masks[0])
+            for i,mask in enumerate(masks):
+                mask = np.array(mask)
+                pixel_count = (mask == 1).sum()
+                if(pixel_count == 0):
+                    continue
+                uniform_value = parcel_values[i]/pixel_count
+                uniform_value_map = np.add(mask*uniform_value, uniform_value_map)
+
+            uniform_value_map = torch.tensor(uniform_value_map).float()
+            total_parcel_mask = (uniform_value_map > 0)
+            
+            sample = {'image':img, 'total_parcel_mask':total_parcel_mask,
+                        'uniform_value_map': uniform_value_map}
+        else:
+            sample = {'image':img, 'masks':masks,
+                        'values': parcel_values}
+
+        return sample
 
     def __len__(self):
         return len(self.vals)

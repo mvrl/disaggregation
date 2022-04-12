@@ -25,13 +25,38 @@ class RALModule(pl.LightningModule):
 
     def forward(self, x):
         x = self.unet(x)
-        x = torch.flatten(x, start_dim=2)
-        return x
+        return x # B x 1 x H x W
+
+    def value_predictions(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        vals = self(image)
+        # Shape: B X 1 X H X W
+
+        vals = torch.flatten(vals, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+        
+        #Aggregate
+        vals_sums = torch.matmul(vals.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = vals_sums.nonzero(as_tuple=True)
+        vals_sums = vals_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        return vals_sums, values
 
     def shared_step(self, batch):
-        image, masks, values = batch
+        image, masks, values = batch['image'], batch['masks'], batch['values']
 
         output = self(image)
+        output = torch.flatten(output, start_dim=2)
 
         masks = torch.flatten(masks,start_dim = 2)
         masks = torch.swapdims(masks,2,1)
@@ -77,25 +102,40 @@ class UniformModule(pl.LightningModule):
             self.unet.load_state_dict(model_state)
 
         self.loss = nn.L1Loss()
-        self.agg = util.regionAgg_layer()
 
     def forward(self, x):
         x = self.unet(x)
-        return x
+        return x # B x 1 x H x W
 
     def cnnOutput(self, x):
         x = self.unet(x)
         return x
 
-    def get_valOut(self, x):
-        x = self.unet(x)
-        return x
+    def value_predictions(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
 
-    def pred_Out(self, x, masks):
-        output = self(x)
-        output = torch.flatten(output, start_dim=1)
-        estimated_values = self.agg(output, masks)
-        return estimated_values
+        vals = self(image)
+        # Shape: B X 1 X H X W
+
+        vals = torch.flatten(vals, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+        
+        #Aggregate
+        vals_sums = torch.matmul(vals.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = vals_sums.nonzero(as_tuple=True)
+        vals_sums = vals_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        # est values, true values
+        return vals_sums, values
 
     def shared_step(self, batch):
         output = self(batch['image']).squeeze(1)
@@ -139,19 +179,77 @@ class RSampleModule(pl.LightningModule):
 
     def forward(self, x):
         x = self.unet(x)
-        #x = self.softplus(x)
         
         means = x[:,0]
         vars = x[:,1]
         vars = self.softplus(vars)
 
-        #stay above 0
-        vars = vars + 1e-16
+        #stay above 0s
+        vars = vars + torch.tensor(1e-16)
 
-        return means, vars
+        return means, vars # B x H x W ? 
+
+    def value_predictions(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+        
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        return means_sums, values
+
+    def prob_eval(self, batch, boundary_val):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        vars_sums = torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        vars_sums = vars_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        # build the distributions and take the log prob
+        gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
+        log_prob = gauss.log_prob(values)
+        metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
+
+        return log_prob, metric
 
     def shared_step(self, batch):
-        image, masks, values = batch
+        image, masks, values = batch['image'], batch['masks'], batch['values']
 
         means, vars = self(image)
         gauss = dist.Normal(means, torch.sqrt(vars))
@@ -160,9 +258,6 @@ class RSampleModule(pl.LightningModule):
 
         masks = torch.flatten(masks,start_dim = 2)
         masks = torch.swapdims(masks,2,1)
-
-        print(output.shape)
-        print(masks.shape)
     
         region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
 
@@ -215,22 +310,90 @@ class GaussModule(pl.LightningModule):
         means = x[:,0]
         vars = x[:,1] 
         vars = self.softplus(vars)
-        vars = vars + 1e-16
-        means = torch.flatten(means, start_dim=1)
-        vars = torch.flatten(vars, start_dim=1)
+        vars = vars + torch.tensor(1e-16)
         return means, vars
 
+    def value_predictions(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+        
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        variances_sums =  torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        variances_sums = variances_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        return means_sums, values
+
+    def prob_eval(self, batch, boundary_val):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        vars_sums = torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        vars_sums = vars_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        # build the distributions and take the log prob
+        gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
+        log_prob = gauss.log_prob(values)
+        metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
+
+        return log_prob, metric
+
     def shared_step(self, batch): 
-        image, masks, values = batch
+        image, masks, values = batch['image'], batch['masks'], batch['values']
 
         means, vars = self(image)
         mean_vars = torch.mean(vars)
-        
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
         masks = torch.flatten(masks,start_dim = 2)
         masks = torch.swapdims(masks,2,1)
-    
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+
+        #Aggregate
         means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
         variances_sums =  torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
         squares = torch.square(values.float()-means_sums)
 
         #We need to ignore the zeroes
@@ -238,11 +401,16 @@ class GaussModule(pl.LightningModule):
         means_sums = means_sums[indices]
         variances_sums = variances_sums[indices]
         values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
 
         stds_sums = torch.sqrt(variances_sums)
         gauss = dist.Normal(means_sums, stds_sums)
         
-        loss =  -torch.sum(gauss.log_prob(values)) + torch.sum(squares, dim=1).mean() * torch.tensor(1e-3)
+        # Loss1 = Batch_mean( Average of log_probabities of the true values for parcels in the image divided by num_parcels )
+        # Loss2 = Batch_mean( sum of square errors of predicted means and true values for parcels in the image. )
+        # lamda = 1e-3 
+        
+        loss =  -torch.sum(gauss.log_prob(values))/len(indices) #+ torch.sum(squares, dim=1).mean() * torch.tensor(1e-3)
 
         return {'loss': loss, 'mean_vars': mean_vars}
 
@@ -251,6 +419,67 @@ class GaussModule(pl.LightningModule):
         self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
         self.log('mean_vars', output['mean_vars'], on_epoch = True, batch_size=cfg.train.batch_size)
         return output['loss'] 
+
+    def validation_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        return output['loss']
+
+    def test_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('test_loss', output['loss'], on_epoch = True)
+        return output['loss']
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
+
+class BatchwiseMeanModule(pl.LightningModule):
+    def __init__(self,use_pretrained):
+        super().__init__()
+
+        #Output dimension is LARGE... we need a lot of samples to mean together
+        #I imagine this would collapse to a deterministic model without some regularizer
+        #We would need to check channel-wise variance.           
+
+        self.unet = unet.UNet(in_channels=3, out_channels=128)
+
+        if(use_pretrained):
+            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
+
+            model_state = self.unet.state_dict()
+            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
+            model_state.update(pretrained_state)
+            self.unet.load_state_dict(model_state)
+
+        self.softplus = nn.Softplus()
+
+    def forward(self, x):
+        x = self.unet(x)
+
+        return x # B x channels x H x W 
+
+    def shared_step(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        output = self(image)
+        output = torch.mean(output, dim=1,keepdim= True)
+        output = torch.flatten(output, start_dim=1).unsqueeze(1)
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+    
+        region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
+
+        squares = torch.square(values.float()-region_sums_yhat)
+        loss = torch.sum(squares, dim=1).mean()
+        
+        return {'loss': loss}
+
+    def training_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        return output['loss']
 
     def validation_step(self, batch, batch_idx):
         output = self.shared_step(batch)

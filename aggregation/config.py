@@ -22,17 +22,17 @@ cfg.data.hennepin = edict()
 #Hennepin specific settings
 cfg.data.hennepin.root_dir = '/u/eag-d1/data/Hennepin/new_area_large/' #512x512 patch size
                     # /u/eag-d1/data/Hennepin/new_area/ 302x302 patch size
-cfg.data.hennepin.sample_mode = ''
+cfg.data.hennepin.sample_mode = 'uniform'
 
 
 cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'testing_rebase_rsample'
+cfg.experiment_name = 'uniform_300_batch8'
 
 cfg.train = edict()
 cfg.mode = 'train'
-cfg.train.model = 'rsample'
+cfg.train.model = 'uniform'
 
 cfg.train.use_pretrained = True
 
@@ -44,7 +44,7 @@ cfg.train.validation_split = 0.1         # percentage validation
 cfg.train.test_split = 0.1               # percentage test
 cfg.train.batch_size = 8
 cfg.train.shuffle = True                 # shuffle training samples
-cfg.train.num_epochs = 200              # number of training epochs  ...
+cfg.train.num_epochs = 300              # number of training epochs  ...
 cfg.train.num_workers = 4                # workers for data loading
 cfg.train.device_ids = [0]               # Train on two GPUs? Set True for blackbird
 

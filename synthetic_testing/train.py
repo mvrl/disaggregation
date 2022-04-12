@@ -254,7 +254,6 @@ def main(args):
     logger = TensorBoardLogger(log_dir)
     
     model = regionize_gauss(hparams=args)
-    model.gauss_fit() 
     checkpoint_callback = ModelCheckpoint(monitor='val_loss', mode='min', save_top_k=3, save_last=True)
     
     early_stopping = EarlyStopping('val_loss', patience=args.patience)

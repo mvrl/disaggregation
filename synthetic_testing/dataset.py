@@ -14,7 +14,7 @@ import torch
 class Eurosat(torch.utils.data.Dataset):
    
     
-    def __init__(self, mode='train', root='/u/amo-d0/grad/aan244/disagg/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif/'):
+    def __init__(self, mode='train', root='/localdisk0/SCRATCH/watch/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
         data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
 
         if mode == 'train':
@@ -49,7 +49,8 @@ class Eurosat(torch.utils.data.Dataset):
         image = transformed['image']
         image = torch.tensor(image).permute(2, 0, 1)
         
-        label = image[7,:, :]
+        label = torch.tensor(item[0]).permute(2,0,1)
+        label = label[7,:,:]
         image = image[[3,2,1],:,:]
         
         label = (label - torch.mean(label)) / torch.std(label)
@@ -59,6 +60,5 @@ class Eurosat(torch.utils.data.Dataset):
             norm_image.append(np.array((image[i,:,:]-image[i,:,:].mean())/(image[i,:,:].std())).tolist())
 
         image = torch.tensor(norm_image)
-        
         return {'image': image, 'label': label}
 

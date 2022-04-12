@@ -23,23 +23,28 @@ import os
 
 
 def MSE(outputs, targets):
-    losses = []
-    for output,target in zip(outputs,targets):
-        losses.append( torch.sum((output - target)**2) )
-       # print (output, "output")
-       # print(target, "target")
-       # print (losses)
-    loss = torch.stack(losses, dim=0).mean()
+    
+    losses = (outputs - targets)**2
+    losses = (torch.sum(losses, 2).sum(1))
+    losses = torch.mean(losses)
+    
+    return losses
+
+def gaussLoss_a(mean, var, target):
+    
+    std = torch.sqrt(var)
+    gauss = dist.Normal(mean, std)
+    loss = gauss.log_prob(target)
+    loss = -(torch.sum(loss, 2).sum(1))
+    loss = torch.mean(loss)
     return loss
 
-
-def gaussLoss(means, vari, targets):
-    losses = []
-    for mean,var,target in zip(means,vari,targets):
-        std = torch.sqrt(var)
-        gauss = dist.Normal(mean, std)
-        losses.append(-torch.sum(gauss.log_prob(target)))
-    loss = torch.stack(losses, dim=0).mean()
+def gaussLoss(mean, var, targets):
+   
+    std = torch.sqrt(var)
+    gauss = dist.Normal(mean, std)
+    log_prob = gauss.log_prob(targets)
+    loss = -(torch.mean(log_prob))
     return loss
 
 class regionize_gauss(pl.LightningModule):
@@ -64,8 +69,7 @@ class regionize_gauss(pl.LightningModule):
 
         mean = x[:, 0]
         var = x[:, 1]
-        var = self.softplus(var*-0.1+0.5)
-        print (var, "var")
+        var = self.softplus(var)+1e-16
 
 
         return mean, var
@@ -87,7 +91,6 @@ class regionize_gauss(pl.LightningModule):
         for mean,var,target in zip(means,vari, targets):
             std = torch.sqrt(var)
             gauss = dist.Normal(mean, std)
-            print( mean, std, target, gauss.log_prob(target) )
             losses.append(np.array(gauss.log_prob(target).detach().cpu()).tolist())
         return torch.tensor(losses).mean()
     
@@ -104,65 +107,86 @@ class regionize_gauss(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
         
-        log_out = self.log_out(images, labels)
+        log_out = 0 #self.log_out(images, labels)
 
+        means, var = self (images)
+        mse = (torch.square (means-labels)).mean()
         if (self.hparams.method == "analytical" or self.hparams.method == "rsample"):
-            agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
-            labels = self.flatten(agg_labels)
-        
+            labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
         
         if (self.hparams.method == "interpolate"):
             agg_labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
             labels = torch.nn.functional.interpolate(agg_labels.unsqueeze(1), size=(64,64), mode='bicubic')
-
+            labels = labels.squeeze(1) 
         
-        if (self.hparams.method == "full res"):
+        if (self.hparams.method == "full_res"):
             labels = labels
 
-        means, var = self (images)
-        print (means, "means")
-        print (var, "var")
-        print (labels, "labels")
+       # print (mae, "mae")
+       # print (means, "means")
+       # print (var, "var")
+       # print (labels, "labels")
         if (self.hparams.method == "analytical"):
-            agg_mean = self.avg_pool(means)# * self.hparams.kernel_size**2
-            agg_var = self.avg_pool(var)# * self.hparams.kernel_size**2
+            means = self.avg_pool(means)# * self.hparams.kernel_size**2
+            var = self.avg_pool(var)# * self.hparams.kernel_size**2
 
-            means = self.flatten(agg_mean)
-            var = self.flatten(agg_var)
+          #  means = self.flatten(agg_mean)
+          #  var = self.flatten(agg_var)
              
         
-        if ( self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
+        if ( self.hparams.method == "interpolate" or self.hparams.method =="full_res" or self.hparams.method == "rsample"):
             
+            k = 100
             gauss_dist = dist.Normal(means, torch.sqrt(var))
-            sample = gauss_dist.rsample()
-
-            entropy =  -torch.mean(gauss_dist.entropy())
+            sample = torch.zeros(k,means.shape[0],means.shape[1], means.shape[2]).to('cuda')
+            for i in range (k):
+                sample[i] = gauss_dist.rsample()
+            
+       #     print ("sample shape",sample.shape)
+            
+            entropy =  -gauss_dist.entropy().mean()
+            kl = nn.KLDivLoss(reduction = "batchmean")
             mean_var = torch.mean(var)
-
+             
         if (self.hparams.method == "rsample"):
             
-            est = self.avg_pool(means)
-            est = self.flatten(est)
-            var = self.avg_pool(var)
-            var = self.flatten(var)
-
-            gauss_dist = dist.Normal(est, torch.sqrt(var))
-            sample = gauss_dist.rsample()
-
-            entropy =  -torch.mean(gauss_dist.entropy())
-            loss = MSE(sample, labels) + entropy*torch.tensor(1e3)
+            est = self.avg_pool(sample)
+            est = self.flatten (est)
+            labels = torch.flatten(labels)
+          
+       #     print (labels.shape) 
+            mean_d = torch.mean (est, 0)
+            std_d = torch.std (est, 0)
+            var_d = std_d**2
+            
+         #   print (mean_d.shape, std_d.shape, labels.shape)
+            loss = gaussLoss(mean_d, var_d, labels) + self.hparams.lambdaa*entropy
+           # loss = MSE(est, labels) + self.hparams.lambdaa*entropy
 
         elif (self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
-            loss = MSE(sample, labels) + entropy* torch.tensor(1e3)
-            print(loss, "loss")
-        else:
+         #   print (sample.shape, labels.shape)
+            est = self.flatten (sample)
+            labels = torch.flatten(labels)
+            mean_d = torch.mean (est, 0)
+            std_d = torch.std (est, 0)
+
+        #    print (mean_d.shape, std_d.shape, labels.shape)
+            var_d = std_d**2
+            loss = gaussLoss(mean_d, var_d, labels) + self.hparams.lambdaa*entropy
+
+           # loss = MSE(sample, labels) +1e3* kl(sample, dist.Normal(torch.zeros(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")
+           #     ,torch.ones(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")).rsample()) 
+        else :
          #   print (means,var, "meanvar")
-            loss = gaussLoss(means, var, labels)
+            loss = gaussLoss_a(means, var, labels)
         
         if (self.hparams.method =="analytical"):
             entropy = 0
+            mean_var = 0
 
-        return {'loss': loss, 'entropy': entropy, 'log_out': log_out}
+        return {'loss': loss, 'entropy': entropy,
+                'log_out': log_out, "mean_var": mean_var,
+                'mse': mse}
     
     def training_step(self, batch, batch_idx):
         
@@ -172,6 +196,10 @@ class regionize_gauss(pl.LightningModule):
         self.log('entropy', output['entropy'],  
                 on_epoch = True, batch_size=self.hparams.batch_size)
         self.log('log_prob', output['log_out'],
+                on_epoch = True, batch_size=self.hparams.batch_size)
+        self.log('var', output['mean_var'],
+                on_epoch = True, batch_size=self.hparams.batch_size)
+        self.log('mse', output['mse'],
                 on_epoch = True, batch_size=self.hparams.batch_size)
         return output['loss']
     
@@ -203,12 +231,22 @@ class regionize_gauss(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
         
         return {'optimizer': optimizer}
- 
+    
+    def gauss_fit(self):
+        
+        import scipy
+        from scipy.optimize import curve_fit
+        from scipy.stats import norm
+        data_y = []
+        for i in range(self.trainset.__len__()):
+            data_y.append(self.avg_pool(self.trainset.__getitem__(i)['label'].unsqueeze(0)).numpy())
+        mean, std= scipy.stats.norm.fit( data_y)
+        return mean, std
+
 def main(args):
                              
     if type(args)==dict:
             args = Namespace(**args)
-    
     method = args.method
     log_dir = '{}/{}/{}'.format(
         args.save_dir,
@@ -218,15 +256,13 @@ def main(args):
 
     logger = TensorBoardLogger(log_dir)
     
-    
     model = regionize_gauss(hparams=args)
-
+    model.gauss_fit() 
     checkpoint_callback = ModelCheckpoint(monitor='val_loss', mode='min', save_top_k=3, save_last=True)
     
     early_stopping = EarlyStopping('val_loss', patience=args.patience)
 
     best_path = checkpoint_callback.best_model_path
-    
     trainer = pl.Trainer.from_argparse_args(args,
                                             max_epochs = args.max_epochs,
                                             logger=logger, 
@@ -239,16 +275,16 @@ if __name__ == '__main__':
     from argparse import ArgumentParser, Namespace 
     
     parser = ArgumentParser()
-    
     parser.add_argument('--max_epochs', type=int, default=150)
-    parser.add_argument('--workers', type=int, default=8)
+    parser.add_argument('--workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='new_logs')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=16)
+    parser.add_argument('--kernel_size', type=int, default=8)
     parser.add_argument('--patience', type=int, default=100)
                          
     parser.add_argument('--method', type=str, default='analytical')
-    args = parser.parse_args() 
+    parser.add_argument('--lambdaa', type=float, default=0.)
+    args = parser.parse_args()
     main(args)

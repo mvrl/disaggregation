@@ -39,19 +39,21 @@ def generate_pred_lists(model, dir_path, method):
 
                 
                 log = model.log_out(images,labels).cpu().numpy().tolist()
-                print (log, "log")
                 logs.append(log)
                 
                 gauss = dist.Normal (estimated_values, torch.sqrt(model.pred_Out(images)[1]))
                 
                 ro = ((gauss.cdf(labels + 0.8) - gauss.cdf(labels - 0.8))[0].cpu().numpy().tolist())
                 ros.extend (ro)
-    
+                
+                
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
     log_error= (np.array(logs)).mean()
     ro_mean = (np.array(ros)).mean()
-
-    return mae_errors.mean(), log_error, ro_mean
+    
+    gaussian = ( np.array(value_arr) - np.array(model.gauss_fit()[0]))**2
+    print (gaussian.mean(), "gauss") 
+    return mse_errors.mean(), log_error, ro_mean
 
 def main(args):
 
@@ -61,7 +63,7 @@ def main(args):
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
     #use the desired check point path
-    ckpt_path = os.path.join(dir_path, 'new_logs/full_res/16/default/version_58/checkpoints/last.ckpt')
+    ckpt_path = os.path.join(dir_path, 'new_logs/interpolate/16/default/version_17/checkpoints/last.ckpt')
     torch.cuda.set_device(1)
     
 

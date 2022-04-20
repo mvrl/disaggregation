@@ -21,6 +21,7 @@ def generate_pred_lists(model, dir_path, method):
                 ) 
 
     estimated_arr = []
+    std_arr = []
     value_arr = []
     logs = []
     ros = []
@@ -29,30 +30,35 @@ def generate_pred_lists(model, dir_path, method):
                 
                 images = sample['image']
                 labels = sample['label']
-
                 
+                labels = torch.flatten(labels, 1, 2) 
                 estimated_values = model.pred_Out(images)[0]
+                std_values = model.pred_Out(images)[1]
                 
 
                 estimated_arr.extend( estimated_values[0].cpu().numpy().tolist())
+                std_arr.extend( std_values[0].cpu().numpy().tolist())
                 value_arr.extend(labels[0].cpu().numpy().tolist())
 
-                
-                log = model.log_out(images,labels).cpu().numpy().tolist()
+                log = train.gaussLoss_test(estimated_values[0],torch.sqrt(model.pred_Out(images)[1][0]),labels).cpu().numpy().tolist()
+                print(log)
                 logs.append(log)
                 
                 gauss = dist.Normal (estimated_values, torch.sqrt(model.pred_Out(images)[1]))
                 
                 ro = ((gauss.cdf(labels + 0.8) - gauss.cdf(labels - 0.8))[0].cpu().numpy().tolist())
                 ros.extend (ro)
+               
+
                 
                 
-    mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))
+    mse_errors = np.square( np.array(value_arr) - np.array(estimated_arr))
     log_error= (np.array(logs)).mean()
     ro_mean = (np.array(ros)).mean()
     
     gaussian = ( np.array(value_arr) - np.array(model.gauss_fit()[0]))**2
-    print (gaussian.mean(), "gauss") 
+    print (gaussian.mean(), "gaussmodel mse") 
+    print (np.array(std_arr).mean(), "std") 
     return mse_errors.mean(), log_error, ro_mean
 
 def main(args):
@@ -63,7 +69,7 @@ def main(args):
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
     #use the desired check point path
-    ckpt_path = os.path.join(dir_path, 'new_logs/interpolate/16/default/version_17/checkpoints/last.ckpt')
+    ckpt_path = os.path.join(dir_path, 'new_logs/interpolate/16/default/version_25/checkpoints/last.ckpt')
     torch.cuda.set_device(1)
     
 
@@ -73,7 +79,7 @@ def main(args):
     mae_error,log_error, ro = generate_pred_lists(model, dir_path, args.method)
     
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats for: "+str(args.method), "\nMAE: "+ str(mae_error),
+    L = ["\nTest Stats for: "+str(args.method), "\nMSE: "+ str(mae_error),
             "\nAverage Log Prob: "+ str(log_error),"\nro: "+ str(ro)   ]
 
     test_file.writelines(L)

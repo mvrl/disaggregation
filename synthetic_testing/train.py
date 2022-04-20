@@ -30,20 +30,20 @@ def MSE(outputs, targets):
     
     return losses
 
-def gaussLoss_a(mean, var, target):
+def gaussLoss_train(mean, std, target):
     
-    std = torch.sqrt(var)
     gauss = dist.Normal(mean, std)
     loss = gauss.log_prob(target)
-    loss = -(torch.sum(loss, 2).sum(1))
+    loss = -(torch.mean(loss, 1))
     loss = torch.mean(loss)
     return loss
 
-def gaussLoss(mean, std, targets):
-   
+def gaussLoss_test(mean, std, target):
+    
     gauss = dist.Normal(mean, std)
-    log_prob = gauss.log_prob(targets)
-    loss = -(torch.mean(log_prob))
+    loss = gauss.log_prob(target)
+    loss = -(torch.mean(loss, 1))
+    loss = torch.mean(loss)
     return loss
 
 class regionize_gauss(pl.LightningModule):
@@ -77,22 +77,12 @@ class regionize_gauss(pl.LightningModule):
     def pred_Out(self, x):
        
         means, var  = self(x)
-
+        means = torch.flatten (means, 1,2)
+        var = torch.flatten (var, 1,2)
         return means, var
         
     
 
-    def log_out(self, x, targets):
-        
-        means, vari = self(x)
-        
-        losses=[]
-        for mean,var,target in zip(means,vari, targets):
-            std = torch.sqrt(var)
-            gauss = dist.Normal(mean, std)
-            losses.append(np.array(gauss.log_prob(target).detach().cpu()).tolist())
-        return torch.tensor(losses).mean()
-    
     def agg_labels(self, labels):
         
         labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
@@ -106,10 +96,10 @@ class regionize_gauss(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
         
-        log_out = 0 #self.log_out(images, labels)
-
         means, var = self (images)
+        mean_var = torch.mean(var)  
         mse = (torch.square (means-labels)).mean()
+        
         if (self.hparams.method == "analytical" or self.hparams.method == "rsample"):
             labels = self.avg_pool(labels)# * self.hparams.kernel_size**2
         
@@ -128,6 +118,10 @@ class regionize_gauss(pl.LightningModule):
         if (self.hparams.method == "analytical"):
             means = self.avg_pool(means)# * self.hparams.kernel_size**2
             var = self.avg_pool(var)# * self.hparams.kernel_size**2
+            
+            means = torch.flatten (means, 1,2)
+            std = torch.sqrt (torch.flatten (var, 1,2))
+            labels = self.flatten(labels)
 
           #  means = self.flatten(agg_mean)
           #  var = self.flatten(agg_var)
@@ -135,54 +129,55 @@ class regionize_gauss(pl.LightningModule):
         
         if ( self.hparams.method == "interpolate" or self.hparams.method =="full_res" or self.hparams.method == "rsample"):
             
-            k = 100
-            gauss_dist = dist.Normal(means, torch.sqrt(var))
+            k = 500
             sample = torch.zeros(k,means.shape[0],means.shape[1], means.shape[2]).to('cuda')
+            
+            gauss_dist = dist.Normal(means, torch.sqrt(var))
+            
             for i in range (k):
                 sample[i] = gauss_dist.rsample()
             
        #     print ("sample shape",sample.shape)
             
             entropy =  -gauss_dist.entropy().mean()
-            kl = nn.KLDivLoss(reduction = "batchmean")
-            mean_var = torch.mean(var)
              
         if (self.hparams.method == "rsample"):
             
             est = self.avg_pool(sample)
-            est = self.flatten (est)
-            labels = torch.flatten(labels)
-          
-       #     print (labels.shape) 
+            est = torch.flatten (est, 2,3)
+    #        print (est.shape)
+            labels = self.flatten(labels)
+    #        print (labels.shape) 
             mean_d = torch.mean (est, 0)
             std_d = torch.std (est, 0)
-            
+    #        print (mean_d.shape, std_d.shape, "sh") 
          #   print (mean_d.shape, std_d.shape, labels.shape)
-            loss = gaussLoss(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
+            loss = gaussLoss_train(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
            # loss = MSE(est, labels) + self.hparams.lambdaa*entropy
 
         elif (self.hparams.method == "interpolate" or self.hparams.method =="full_res"):
-         #   print (sample.shape, labels.shape)
-            est = self.flatten (sample)
-            labels = torch.flatten(labels)
+           # print (sample.shape, labels.shape)
+            est = torch.flatten (sample, 2,3)
+           # print (est.shape, "est")
+            labels = self.flatten(labels)
+           # print (labels.shape, "label")
             mean_d = torch.mean (est, 0)
             std_d = torch.std (est, 0)
 
-        #    print (mean_d.shape, std_d.shape, labels.shape)
-            loss = gaussLoss(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
+           # print (mean_d.shape, std_d.shape, labels.shape, "all")
+            loss = gaussLoss_train(mean_d, std_d, labels) + self.hparams.lambdaa*entropy
 
            # loss = MSE(sample, labels) +1e3* kl(sample, dist.Normal(torch.zeros(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")
            #     ,torch.ones(sample.shape[0], sample.shape[1], sample.shape[2]).to("cuda")).rsample()) 
         else :
          #   print (means,var, "meanvar")
-            loss = gaussLoss_a(means, var, labels)
+            loss = gaussLoss_train(means, std, labels)
         
         if (self.hparams.method =="analytical"):
             entropy = 0
-            mean_var = 0
 
         return {'loss': loss, 'entropy': entropy,
-                'log_out': log_out, "mean_var": mean_var,
+                "mean_var": mean_var,
                 'mse': mse}
     
     def training_step(self, batch, batch_idx):
@@ -191,8 +186,6 @@ class regionize_gauss(pl.LightningModule):
         self.log('train_loss', output['loss'],  
                 on_epoch = True, batch_size=self.hparams.batch_size)
         self.log('entropy', output['entropy'],  
-                on_epoch = True, batch_size=self.hparams.batch_size)
-        self.log('log_prob', output['log_out'],
                 on_epoch = True, batch_size=self.hparams.batch_size)
         self.log('var', output['mean_var'],
                 on_epoch = True, batch_size=self.hparams.batch_size)
@@ -234,10 +227,15 @@ class regionize_gauss(pl.LightningModule):
         import scipy
         from scipy.optimize import curve_fit
         from scipy.stats import norm
+
         data_y = []
+        data_x = []
+        
         for i in range(self.trainset.__len__()):
             data_y.append(self.avg_pool(self.trainset.__getitem__(i)['label'].unsqueeze(0)).numpy())
+            data_x.append(self.trainset.__getitem__(i)['image'].unsqueeze(0).numpy())
         mean, std= scipy.stats.norm.fit( data_y)
+        print (data_x[0], data_y[0], data_y[0].max(), data_y[0].min(), data_y[0].std(),mean, std)
         return mean, std
 
 def main(args):
@@ -271,13 +269,13 @@ if __name__ == '__main__':
     from argparse import ArgumentParser, Namespace 
     
     parser = ArgumentParser()
-    parser.add_argument('--max_epochs', type=int, default=150)
+    parser.add_argument('--max_epochs', type=int, default=50)
     parser.add_argument('--workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='new_logs')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=8)
+    parser.add_argument('--kernel_size', type=int, default=16)
     parser.add_argument('--patience', type=int, default=100)
                          
     parser.add_argument('--method', type=str, default='analytical')

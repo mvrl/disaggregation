@@ -34,7 +34,7 @@ def gaussLoss_train(mean, std, target):
     
     gauss = dist.Normal(mean, std)
     loss = gauss.log_prob(target)
-    loss = -(torch.mean(loss, 1))
+    loss = -(torch.sum(loss, 1))
     loss = torch.mean(loss)
     return loss
 

@@ -40,7 +40,7 @@ class dataset_hennepin_rebase(Dataset):
 
     def __getitem__(self, idx):
 
-        img_path =  os.path.join(self.img_dir,str(idx)+".jpg")
+        img_path =  os.path.join(self.img_dir,str(idx)+".png")
         mask_path =  os.path.join(self.mask_dir,str(idx)+".pkl")
 
         #if self.mode == 'train':
@@ -76,8 +76,7 @@ class dataset_hennepin_rebase(Dataset):
                     img = transforms_function.vflip(img)
                     masks = transforms_function.vflip(masks)
         else:
-            from_pil_transform = transforms.ToTensor()
-            img = from_pil_transform(img)
+            img = self.transform(img)
 
         parcel_values = self.vals[idx]
 

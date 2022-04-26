@@ -42,7 +42,7 @@ def build_dataset(df, data_dir, gdf, dest_folder):
             continue
 
         #image
-        image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'.0_'+str(int(row['lon_mid']))+'.0.tif')
+        image_name = os.path.join(dir_path, str(int(row['lat_mid']))+'_'+str(int(row['lon_mid']))+'.png')
         image = Image.open(image_name)
         #image = np.array(image)
         all_images.append(image)
@@ -80,7 +80,7 @@ def build_dataset(df, data_dir, gdf, dest_folder):
         all_masks.append(masks)
 
     for i,image in tqdm(enumerate(all_images)):
-        img_save_path = os.path.join(dest_folder, 'imgs', str(i)+".jpg")
+        img_save_path = os.path.join(dest_folder, 'imgs', str(i)+".png")
         image.save(img_save_path)
         mask_save_path = os.path.join(dest_folder, 'masks', str(i)+".pkl")
         with open(mask_save_path, 'wb') as f:
@@ -92,10 +92,11 @@ def build_dataset(df, data_dir, gdf, dest_folder):
 
 if __name__ == "__main__":
 
-    data_dir = '/u/eag-d1/data/Hennepin/new_area/'
+    data_dir = '/u/eag-d1/data/Hennepin/new_area_302_fixed/'
 
     csv_path = os.path.join(data_dir, 'hennepin_bbox.csv')
-    shp_path = os.path.join(data_dir, 'hennepin.shp')
+    #shp_path = os.path.join(data_dir, 'hennepin.shp')
+    shp_path = "/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp"
     ds_path = os.path.join(data_dir, 'dataset_compiled')
 
     df = pd.read_csv(csv_path)
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     gdf = gpd.read_file(shp_path)
     print("dataset_hennepin: Done...")
     # Watch for outliers
-    gdf = gdf[gdf['TOTAL_MV1'].between(gdf['TOTAL_MV1'].quantile(0.05), gdf['TOTAL_MV1'].quantile(0.95))]
+    #gdf = gdf[gdf['TOTAL_MV1'].between(gdf['TOTAL_MV1'].quantile(0.05), gdf['TOTAL_MV1'].quantile(0.95))]
     print("dataset_hennepin: Reading Images, pickling...")
 
     path = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1/'

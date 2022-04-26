@@ -41,8 +41,10 @@ def generate_pred_lists(model, dir_path):
 
                 estimated_values, true_values = model.value_predictions(batch)
                 #print(estimated_values.shape)
+                print(estimated_values)
+                print(true_values)
 
-                if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
+                if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
 
                     interval_val = torch.tensor(10000)
                     log, metric = model.prob_eval(batch,interval_val)
@@ -67,7 +69,7 @@ def generate_pred_lists(model, dir_path):
     mse_errors = np.array(value_arr) - np.array(estimated_arr)
     mse_errors = np.power(mse_errors,2)
 
-    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
+    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
         logs= np.array(logs)
         metrics = np.array(metrics)
     else:

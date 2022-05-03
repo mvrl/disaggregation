@@ -464,7 +464,7 @@ class LOGRSampleModule(pl.LightningModule):
 
         return means, vars # B x H x W ? 
 
-    def value_predictions(self, batch):
+    def nsample(self, batch):
         image, masks, values = batch['image'], batch['masks'], batch['values']
 
         means, vars = self(image)
@@ -472,7 +472,7 @@ class LOGRSampleModule(pl.LightningModule):
 
         # Take num_samples samples
         samples = []
-        for i in range(0,self.num_samples):
+        for i in range(0, self.num_samples):
             sample = gauss.rsample()
             output = torch.flatten(sample, start_dim=1).unsqueeze(1)
             samples.append(output)
@@ -482,8 +482,8 @@ class LOGRSampleModule(pl.LightningModule):
 
         #Aggregate
         region_sums = []
-        for i in range(0,100):
-            region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
+        for i in range(0, self.num_samples):
+            region_sums_yhat = torch.matmul(sample[i].float(), masks.float()).squeeze(1)
             region_sums.append(region_sums_yhat)
 
         #Compute statistsics of samples
@@ -502,46 +502,15 @@ class LOGRSampleModule(pl.LightningModule):
         std = std + torch.tensor(1)
         gauss = dist.Normal(mean,std)
 
+        return gauss, mean, std, values
+
+    def value_predictions(self, batch):
+        #image, masks, values = batch['image'], batch['masks'], batch['values']
+        gauss, mean, std, values = self.nsample()
         return mean, values
 
     def prob_eval(self, batch, boundary_val):
-        image, masks, values = batch['image'], batch['masks'], batch['values']
-
-        means, vars = self(image)
-        gauss = dist.Normal(means, torch.sqrt(vars))
-
-        # Take num_samples samples
-        samples = []
-        for i in range(0,self.num_samples):
-            sample = gauss.rsample()
-            output = torch.flatten(sample, start_dim=1).unsqueeze(1)
-            samples.append(output)
-
-        masks = torch.flatten(masks,start_dim = 2)
-        masks = torch.swapdims(masks,2,1)
-
-        #Aggregate
-        region_sums = []
-        for i in range(0,100):
-            region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
-            region_sums.append(region_sums_yhat)
-
-        #Compute statistsics of samples
-        region_sums = torch.stack(region_sums)
-        mean = torch.mean(region_sums, dim = 0)
-        std = torch.std(region_sums, dim = 0)
-
-        #We need to ignore the zeroes
-        indices = mean.nonzero(as_tuple=True)
-        mean = mean[indices]
-        std = std[indices]
-        values = values[indices]
-        #Shape: num_parcels (IN ALL OF BATCH)
-
-        #Avoid std = 0
-        std = std + torch.tensor(1)
-        gauss = dist.Normal(mean,std)
-
+        gauss, mean, std, values = self.nsample()
         # build the distributions and take the log prob
         #gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
         log_prob = gauss.log_prob(values)
@@ -550,44 +519,9 @@ class LOGRSampleModule(pl.LightningModule):
         return log_prob, metric
 
     def shared_step(self, batch):
-        image, masks, values = batch['image'], batch['masks'], batch['values']
-
-        means, vars = self(image)
-        gauss = dist.Normal(means, torch.sqrt(vars))
-
-        # Take num_samples samples
-        samples = []
-        for i in range(0,self.num_samples):
-            sample = gauss.rsample()
-            output = torch.flatten(sample, start_dim=1).unsqueeze(1)
-            samples.append(output)
-
-        masks = torch.flatten(masks,start_dim = 2)
-        masks = torch.swapdims(masks,2,1)
-
-        #Aggregate
-        region_sums = []
-        for i in range(0,100):
-            region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
-            region_sums.append(region_sums_yhat)
-
-        #Compute statistsics of samples
-        region_sums = torch.stack(region_sums)
-        mean = torch.mean(region_sums, dim = 0)
-        std = torch.std(region_sums, dim = 0)
-
-        #We need to ignore the zeroes
-        indices = mean.nonzero(as_tuple=True)
-        mean = mean[indices]
-        std = std[indices]
-        values = values[indices]
-        #Shape: num_parcels (IN ALL OF BATCH)
-
-        #Avoid std = 0
-        std = std + torch.tensor(1)
-        gauss = dist.Normal(mean,std)
+        gauss, mean, std, values = self.nsample()
         
-        loss =  -torch.sum(gauss.log_prob(values))/len(indices)
+        loss =  -torch.sum(gauss.log_prob(values))/len(values)
         return {'loss': loss}
 
     def training_step(self, batch, batch_idx):

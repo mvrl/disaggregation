@@ -16,8 +16,12 @@ from PIL import Image
 
 class dataset_hennepin_rebase(Dataset):        
     def __init__(self, mode, sample_mode):
+        
+        if sample_mode == 'combine' or sample_mode == 'combine_uniform':
+            self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED/'
+        else:
+            self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1/'
 
-        self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1/'
         self.mode = mode
         self.sample_mode = sample_mode
 
@@ -80,7 +84,7 @@ class dataset_hennepin_rebase(Dataset):
 
         parcel_values = self.vals[idx]
 
-        if(self.sample_mode == 'uniform'):
+        if(self.sample_mode == 'uniform' or self.sample_mode == 'combine_uniform'):
             uniform_value_map = np.zeros_like(masks[0])
             total_parcel_mask = np.zeros_like(masks[0])
             for i,mask in enumerate(masks):

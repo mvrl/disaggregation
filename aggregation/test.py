@@ -76,12 +76,15 @@ def generate_pred_lists(model, dir_path):
         logs= 0
         metrics = 0
 
-    return mae_errors.mean(), mse_errors.mean(), np.mean(logs), relative_error.mean()*100, np.mean(metrics)
+    return mae_errors.mean(), mse_errors.mean(), np.mean(logs), np.median(logs), relative_error.mean()*100, np.mean(metrics)
 
 def loadModel(ckpt_path, model_name = cfg.train.model):
     model =train.chooseModel(model_name)
-
-    model = model.load_from_checkpoint(ckpt_path, 
+    if(model_name == 'logsample'):
+         model = model.load_from_checkpoint(ckpt_path, 
+        use_pretrained=False, num_samples= cfg.train.num_samples)
+    else:
+        model = model.load_from_checkpoint(ckpt_path, 
         use_pretrained=False)
     return model
 
@@ -94,8 +97,8 @@ if __name__ == '__main__':
 
     model = loadModel(ckpt_path , cfg.train.model)
 
-    mae_error, mse_error, log_error, percent_error, metric_mean = generate_pred_lists(model, dir_path)
+    mae_error, mse_error, log_error, med_log_error, percent_error, metric_mean = generate_pred_lists(model, dir_path)
 
     test_file = open(test_file_path,"a")
-    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nAvg Percent Error: "+ str(percent_error), "\nAverage Log Prob: "+ str(log_error), "\nAverage Metric 10,0000 Probability: "+ str(metric_mean) ]
+    L = ["\nTest Stats: ", "\nMAE: "+ str(mae_error) , "\nMSE: "+ str(mse_error), "\nAvg Percent Error: "+ str(percent_error), "\nAverage Log Prob: "+ str(log_error),"\nMedian Log Prob: "+ str(med_log_error), "\nAverage Metric 10,0000 Probability: "+ str(metric_mean) ]
     test_file.writelines(L)

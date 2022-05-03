@@ -28,7 +28,7 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'test_logrsample'
+cfg.experiment_name = 'logsample_100'
 
 cfg.train = edict()
 cfg.mode = 'train'
@@ -39,7 +39,8 @@ cfg.train.use_pretrained = True
 cfg.train.patience = 100
 
 cfg.train.lam = 1e7
-
+cfg.train.num_samples = 100  #only with LogSample model
+ 
 cfg.train.validation_split = 0.1         # percentage validation
 cfg.train.test_split = 0.1               # percentage test
 cfg.train.batch_size = 8

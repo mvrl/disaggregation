@@ -28,7 +28,7 @@ def chooseModel(model_name = cfg.train.model):
     if(model_name == 'gauss'):
         model = modules.GaussModule(use_pretrained=cfg.train.use_pretrained)
     if(model_name == 'logsample'):
-        model = modules.LOGRSampleModule(use_pretrained=cfg.train.use_pretrained)
+        model = modules.LOGRSampleModule(use_pretrained=cfg.train.use_pretrained, num_samples = cfg.train.num_samples)
     return model
 
 if __name__ == '__main__':

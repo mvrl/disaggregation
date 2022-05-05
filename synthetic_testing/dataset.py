@@ -18,15 +18,16 @@ class Eurosat(torch.utils.data.Dataset):
         data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
 
         if mode == 'train':
-            train_set, _ = train_test_split(data, test_size=0.2, stratify=data.targets, random_state=42)
+            train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
-               A.HorizontalFlip(p=0.5),
-               A.RandomRotate90(p=1.0),
+             #  A.HorizontalFlip(p=0.5),
+             #  A.RandomRotate90(p=1.0),
+              A.NoOp()
             ],
             )
         elif mode == 'test' or mode == 'validation':
-            _, val_set = train_test_split(data, test_size=0.2, stratify=data.targets, random_state=42)
+            _, val_set = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = val_set
             self.transform = A.Compose([
                A.NoOp()
@@ -49,15 +50,17 @@ class Eurosat(torch.utils.data.Dataset):
         image = transformed['image']
         image = torch.tensor(image).permute(2, 0, 1)
         
-        label = torch.tensor(item[0]).permute(2,0,1)
-        label = label[7,:,:]
+        #label = torch.tensor(item[0]).permute(2,0,1)
+        label = image[7,:,:]
         image = image[[3,2,1],:,:]
         
         label = (label - torch.mean(label)) / torch.std(label)
+#        label = (label - torch.min(label)) / (torch.max(label)-torch.min(label))
         
         norm_image =[]
         for i in range(image.shape[0]):
             norm_image.append(np.array((image[i,:,:]-image[i,:,:].mean())/(image[i,:,:].std())).tolist())
+           # norm_image.append(np.array((image[i,:,:]-image[i,:,:].min())/(image[i,:,:].max()-image[i,:,:].min())).tolist())
 
         image = torch.tensor(norm_image)
         return {'image': image, 'label': label}

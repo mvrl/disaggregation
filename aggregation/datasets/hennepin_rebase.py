@@ -18,7 +18,7 @@ class dataset_hennepin_rebase(Dataset):
     def __init__(self, mode, sample_mode):
         
         if sample_mode == 'combine' or sample_mode == 'combine_uniform':
-            self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED/'
+            self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED_fixed/'
         else:
             self.data_dir = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1/'
 

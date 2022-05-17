@@ -215,7 +215,7 @@ class RSampleModule(pl.LightningModule):
 
         return means_sums, values
 
-    def prob_eval(self, batch, boundary_val):
+    def prob_eval(self, batch, boundary_val, boundary_val2):
         image, masks, values = batch['image'], batch['masks'], batch['values']
 
         means, vars = self(image)
@@ -245,8 +245,8 @@ class RSampleModule(pl.LightningModule):
         gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
         log_prob = gauss.log_prob(values)
         metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
-
-        return log_prob, metric
+        metric2 = gauss.cdf(values + boundary_val2) - gauss.cdf(values - boundary_val2)
+        return log_prob, metric, metric2, torch.sqrt(vars_sums)
 
     def shared_step(self, batch):
         image, masks, values = batch['image'], batch['masks'], batch['values']
@@ -341,7 +341,7 @@ class GaussModule(pl.LightningModule):
 
         return means_sums, values
 
-    def prob_eval(self, batch, boundary_val):
+    def prob_eval(self, batch, boundary_val, boundary_val2):
         image, masks, values = batch['image'], batch['masks'], batch['values']
 
         means, vars = self(image)
@@ -371,8 +371,8 @@ class GaussModule(pl.LightningModule):
         gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
         log_prob = gauss.log_prob(values)
         metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
-
-        return log_prob, metric
+        metric2 = gauss.cdf(values + boundary_val2) - gauss.cdf(values - boundary_val2)
+        return log_prob, metric, metric2, torch.sqrt(vars_sums)
 
     def shared_step(self, batch): 
         image, masks, values = batch['image'], batch['masks'], batch['values']
@@ -434,7 +434,6 @@ class GaussModule(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-
 class LOGRSampleModule(pl.LightningModule):
     def __init__(self,use_pretrained, num_samples):
         super().__init__()
@@ -483,7 +482,7 @@ class LOGRSampleModule(pl.LightningModule):
         #Aggregate
         region_sums = []
         for i in range(0, self.num_samples):
-            region_sums_yhat = torch.matmul(sample[i].float(), masks.float()).squeeze(1)
+            region_sums_yhat = torch.matmul(samples[i].float(), masks.float()).squeeze(1)
             region_sums.append(region_sums_yhat)
 
         #Compute statistsics of samples
@@ -506,20 +505,21 @@ class LOGRSampleModule(pl.LightningModule):
 
     def value_predictions(self, batch):
         #image, masks, values = batch['image'], batch['masks'], batch['values']
-        gauss, mean, std, values = self.nsample()
+        gauss, mean, std, values = self.nsample(batch)
         return mean, values
 
-    def prob_eval(self, batch, boundary_val):
-        gauss, mean, std, values = self.nsample()
+    def prob_eval(self, batch, boundary_val, boundary_val2):
+        gauss, mean, std, values = self.nsample(batch)
         # build the distributions and take the log prob
         #gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
         log_prob = gauss.log_prob(values)
         metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
+        metric2 = gauss.cdf(values + boundary_val2) - gauss.cdf(values - boundary_val2)
 
-        return log_prob, metric
+        return log_prob, metric, metric2, std
 
     def shared_step(self, batch):
-        gauss, mean, std, values = self.nsample()
+        gauss, mean, std, values = self.nsample(batch)
         
         loss =  -torch.sum(gauss.log_prob(values))/len(values)
         return {'loss': loss}

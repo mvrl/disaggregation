@@ -28,13 +28,13 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'logsample_100'
+cfg.experiment_name = 'ral_combined'
 
 cfg.train = edict()
 cfg.mode = 'train'
-cfg.train.model = 'logsample'
+cfg.train.model = 'ral'
 
-cfg.train.use_pretrained = True
+cfg.train.use_pretrained = False
 
 cfg.train.patience = 100
 

@@ -157,5 +157,5 @@ if __name__ == "__main__":
     #gdf = gdf[gdf['TOTAL_MV1'].between(gdf['TOTAL_MV1'].quantile(0.05), gdf['TOTAL_MV1'].quantile(0.95))]
     print("dataset_hennepin: Reading Images, pickling...")
 
-    path = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED2/'
+    path = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED_fixed/'
     build_dataset(df,data_dir,gdf,path, True)   

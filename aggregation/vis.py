@@ -24,29 +24,44 @@ from matplotlib import colors
     lightning_logs?, be able to tensorboard all of them?
 '''
 
+invTrans = transforms.Compose([ transforms.Normalize(mean = [ 0., 0., 0. ],
+                                                     std = [1/0.24120754, 1/0.2294313, 1/0.21295355]),
+                                transforms.Normalize(mean = [-0.4712904,-0.36086863,-0.27999857],
+                                                     std = [ 1., 1., 1. ]),
+                               ])
+
 def generate_images(model, num_images, dir_path):
-    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'vis', sample_mode='')
+    train_loader, val_loader, test_loader = util.make_loaders(batch_size = 1, mode = 'vis', sample_mode='combine')
 
     c = 0
+    model.eval()
     with torch.no_grad():
-        for sample in test_loader:
-            image, masks, value = sample
+        for batch in test_loader:
+            image, masks, value = batch['image'], batch['masks'], batch['values']
+
+
+            indices = value.nonzero(as_tuple=True)
+            masks = masks[indices]
+            value = value[indices]
 
             if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
-                vals, vars = model.get_valOut(image)
-                vars = vars.squeeze(0)
+                vals, vars = model(image)
+                stds = torch.sqrt(vars)
             else:
-                vals= model.get_valOut(image)   
-                vars=0 # NO STANDARD DEVIATIONS
+                vals= model(image)   
+                vals = vals.squeeze(0)
+                stds=0 # NO STANDARD DEVIATIONS
 
-            estimated_values = model.pred_Out(image, masks)
+            estimated_values, test_vals = model.value_predictions(batch)
             #estimated_values = estimated_values.cpu().detach().numpy()
 
-            #Compiling masks... ugly code
-            masks = masks[0]
-            value = value[0]
-            estimated_values= estimated_values[0]
+            print(masks[0].shape)
+            print(value.shape)
+            print(estimated_values.shape)
+
             errors = mask_sum = pred_map = region_map = true_map = np.zeros_like(masks[0])
+
+            print(region_map.shape)
 
             for i,mask in enumerate(masks):
                 mask = np.array(mask)
@@ -93,12 +108,16 @@ def generate_images(model, num_images, dir_path):
             if not(os.path.exists(path)):
                 os.mkdir(path)
 
-            generate_plot(image.squeeze(0),vals.squeeze(0),vars,pred_map,true_map, region_map,errors, path)
+            image = invTrans(image)
+
+            generate_plot(image.squeeze(0),vals,stds,pred_map,true_map, region_map,errors, path)
             c+=1
             if c >= num_images:
                 return
 
 def generate_scatter(model, dir_path):
+
+    dir_path = os.path.join(dir_path,'test_results')
 
     est_pth = os.path.join(dir_path, 'estimated.pkl')
     val_pth = os.path.join(dir_path, 'value.pkl')
@@ -159,10 +178,10 @@ def generate_scatter(model, dir_path):
 
 
 
-def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
+def generate_plot(image,vals, stds, pred_map,true_map, region_map, error, path):
 
     min_lim = 0
-    max_lim = 512
+    max_lim = 302
 
     #plt.set_title("Image")
     plt.imshow(image.permute(1,2,0)) 
@@ -210,14 +229,14 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
     #axs[0][1].set_title("Value Prediction")
 
     if cfg.train.model == 'gauss' or cfg.train.model == 'rsample':
-        plt.imshow(vars.permute(1,2,0), cmap = 'Reds')
+        plt.imshow(stds.permute(1,2,0), cmap = 'Reds')
         #plt.tight_layout(pad=0)
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars"), bbox_inches='tight', pad_inches=0)
+        plt.savefig(os.path.join(path, "stds"), bbox_inches='tight', pad_inches=0)
         plt.colorbar()
-        plt.savefig(os.path.join(path, "vars_withcbar.png"), bbox_inches='tight', pad_inches=0)
+        plt.savefig(os.path.join(path, "stds_withcbar.png"), bbox_inches='tight', pad_inches=0)
         plt.close()
 
         #plt.imshow(vars.permute(1,2,0), cmap = 'Reds', norm=colors.LogNorm())
@@ -231,13 +250,13 @@ def generate_plot(image,vals, vars, pred_map,true_map, region_map, error, path):
         #axs[1][1].set_title("Variance")
 
         color_map = plt.cm.get_cmap('Blues')
-        plt.imshow(vars.permute(1,2,0), cmap = color_map.reversed())
+        plt.imshow(stds.permute(1,2,0), cmap = color_map.reversed())
         #plt.tight_layout(pad=0)
         plt.colorbar()
         plt.axis('off')
         plt.xlim(min_lim, max_lim)
         plt.ylim(min_lim, max_lim)
-        plt.savefig(os.path.join(path, "vars_reversed"), bbox_inches='tight', pad_inches=0)
+        plt.savefig(os.path.join(path, "stds_reversed"), bbox_inches='tight', pad_inches=0)
         plt.close()
         #axs[1][1].set_title("Variance")
 

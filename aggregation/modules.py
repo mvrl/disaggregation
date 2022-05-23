@@ -449,6 +449,9 @@ class LOGRSampleModule(pl.LightningModule):
 
         self.softplus = nn.Softplus()
 
+        self.one_sample_std = torch.nn.Parameter(torch.randn(1))
+        self.one_sample_std.requires_grad = True
+
         self.num_samples = num_samples
 
     def forward(self, x):
@@ -503,13 +506,52 @@ class LOGRSampleModule(pl.LightningModule):
 
         return gauss, mean, std, values
 
+    def one_sample(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        #Use extra model parameter
+        means, vars = self(image)
+        gauss = dist.Normal(means, torch.sqrt(vars))
+
+        #Sample
+        sample = gauss.rsample()
+        output = torch.flatten(sample, start_dim=1).unsqueeze(1)
+
+        #fix mask dimensions
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+
+        #Aggregate
+        region_sums_yhat = torch.matmul(output.float(), masks.float()).squeeze(1)
+
+        #We need to ignore the zeroes
+        indices = region_sums_yhat.nonzero(as_tuple=True)
+        mean = region_sums_yhat[indices]
+        values = values[indices]
+
+        std = self.softplus(self.one_sample_std)
+        gauss = dist.Normal(mean,std)
+
+        return gauss, mean, std, values
+        
+
     def value_predictions(self, batch):
         #image, masks, values = batch['image'], batch['masks'], batch['values']
-        gauss, mean, std, values = self.nsample(batch)
+
+        if self.num_samples == 1:
+            gauss, mean, std, values = self.one_sample(batch)
+        else:
+            gauss, mean, std, values = self.nsample(batch)
+
         return mean, values
 
     def prob_eval(self, batch, boundary_val, boundary_val2):
-        gauss, mean, std, values = self.nsample(batch)
+
+        if self.num_samples == 1:
+            gauss, mean, std, values = self.one_sample(batch)
+        else:
+            gauss, mean, std, values = self.nsample(batch)
+
         # build the distributions and take the log prob
         #gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
         log_prob = gauss.log_prob(values)
@@ -519,7 +561,11 @@ class LOGRSampleModule(pl.LightningModule):
         return log_prob, metric, metric2, std
 
     def shared_step(self, batch):
-        gauss, mean, std, values = self.nsample(batch)
+
+        if self.num_samples == 1:
+            gauss, mean, std, values = self.one_sample(batch)
+        else:
+            gauss, mean, std, values = self.nsample(batch)
         
         loss =  -torch.sum(gauss.log_prob(values))/len(values)
         return {'loss': loss}

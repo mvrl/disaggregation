@@ -7,8 +7,15 @@ import torch.distributions as dist
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 testset = Eurosat(mode='test')
 
+def gaussLoss_test(mean, std, target):
+    gauss = dist.Normal(mean, std)
+    loss = gauss.log_prob(target)
+    loss = -(torch.mean(loss, 1))
+    loss = torch.mean(loss)
+    return loss
 
 def generate_pred_lists(model, dir_path, method):
     test_loader = torch.utils.data.DataLoader(testset,
@@ -30,8 +37,7 @@ def generate_pred_lists(model, dir_path, method):
             labels = sample['label']
             labels = torch.flatten(labels, 1, 2)
 
-            estimated_values = model.pred_Out(images)[0]
-            std_values = model.pred_Out(images)[1]
+            estimated_values, std_values = model.pred_Out(images)
 
             estimated_arr.extend(estimated_values[0].cpu().numpy().tolist())
             std_arr.extend(std_values[0].cpu().numpy().tolist())
@@ -41,9 +47,9 @@ def generate_pred_lists(model, dir_path, method):
             print(log)
             logs.append(log)
 
-            gauss = dist.Normal(estimated_values, model.pred_Out(images)[1])
+            gauss = dist.Normal(estimated_values, std_values)
 
-            ro = ((gauss.cdf(labels + 0.8) - gauss.cdf(labels - 0.8))[0].cpu().numpy().tolist())
+            ro = ((gauss.cdf(labels + 5.) - gauss.cdf(labels - 5.))[0].cpu().numpy().tolist())
             ros.extend(ro)
 
     # plt.imsave( "label"+str(i)+".png", (torch.tensor(labels.squeeze())).cpu())
@@ -54,8 +60,17 @@ def generate_pred_lists(model, dir_path, method):
     mse_errors = np.square(np.array(value_arr) - np.array(estimated_arr))
     log_error = (np.array(logs)).mean()
     ro_mean = (np.array(ros)).mean()
-
     print(np.array(std_arr).mean(), "std")
+    
+    value_arr = np.array(value_arr)
+    gaussian_MSE = ( value_arr - np.array(model.gauss_fit()[0]))**2
+    print (gaussian_MSE.mean(), "gauss_mse")
+    Gauss = model.gauss_fit()[2]
+    log_gaussian = (Gauss.log_prob (torch.tensor(value_arr))).mean()
+    print (log_gaussian,"gauss_log")
+    print (model.gauss_fit()[1], "gauss_std")
+    print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(5.)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(5.))))
+    print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(1.)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(1.))))
     return mse_errors.mean(), log_error, ro_mean
 
 
@@ -63,25 +78,25 @@ def main(args):
     if type(args) == dict:
         args = Namespace(**args)
     dir_path = os.getcwd()
-    test_file_path = os.path.join(dir_path, 'stats.txt')
+    test_file_path = os.path.join(dir_path, 'logg.txt')
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             'new_logs/analytical/16/10/default/version_22/checkpoints/epoch=14-step=2849.ckpt')
+                             '80/logtest/uniform/16/10/default/version_19/checkpoints/epoch=47-step=9119.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
         model = model.load_from_checkpoint(ckpt_path,
-                                           use_pretrained=False)
+                                           use_pretrained=False).eval()
     elif args.method == 'rsample':
         model = train.SamplingRegionAggregator(10, args)
         model = model.load_from_checkpoint(ckpt_path,
-                                           use_pretrained=False, k=10)
+                                           use_pretrained=False, k=10).eval()
 
     mae_error, log_error, ro = generate_pred_lists(model, dir_path, args.method)
 
     test_file = open(test_file_path, "a")
-    L = ["\nTest Stats 100: " + str(args.method), "\nMSE: " + str(mae_error),
+    L = ["\nStats 10: " + str(args.method), "\nMSE: " + str(mae_error),
          "\nAverage Log Prob: " + str(log_error), "\nro: " + str(ro)]
 
     test_file.writelines(L)

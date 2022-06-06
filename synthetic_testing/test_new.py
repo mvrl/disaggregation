@@ -54,8 +54,8 @@ def generate_pred_lists(model, dir_path, method):
 
             gauss = dist.Normal(estimated_values, std_values)
 
-            ro15 = ((gauss.cdf(labels + 0.05) - gauss.cdf(labels - 0.05))[0].cpu().numpy().tolist())
-            ro25 = ((gauss.cdf(labels + 0.1) - gauss.cdf(labels - 0.1))[0].cpu().numpy().tolist())
+            ro15 = ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15))[0].cpu().numpy().tolist())
+            ro25 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25))[0].cpu().numpy().tolist())
             ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35))[0].cpu().numpy().tolist())
             ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5))[0].cpu().numpy().tolist())
             ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.))[0].cpu().numpy().tolist())

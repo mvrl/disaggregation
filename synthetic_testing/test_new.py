@@ -42,7 +42,7 @@ def generate_pred_lists(model, dir_path, method):
             labels = torch.flatten(labels, 1, 2)
 
             estimated_values, std_values = model.pred_Out(images)
-           # estimated_values  = model.pred_Out(images)
+        # estimated_values  = model.pred_Out(images)
 
             estimated_arr.extend(estimated_values[0].cpu().numpy().tolist())
             std_arr.extend(std_values[0].cpu().numpy().tolist())
@@ -64,7 +64,6 @@ def generate_pred_lists(model, dir_path, method):
             ros35.extend(ro35)
             ros50.extend(ro50)
             ros1.extend(ro1)
-            
 
            # print (labels.shape, labels.squeeze().shape)
            # print (estimated_values.shape, estimated_values.squeeze().shape)
@@ -101,16 +100,16 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '80/logtest/analytical/16/10/default/version_18/checkpoints/epoch=66-step=12729.ckpt')
+                             'average/logtest/rsample/16/10/default/version_4/checkpoints/epoch=33-step=6459.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
         model = model.load_from_checkpoint(ckpt_path,
                                            use_pretrained=False).eval()
     elif args.method == 'rsample':
-        model = train.SamplingRegionAggregator(10, args)
-        model = model.load_from_checkpoint(ckpt_path,
-                                           use_pretrained=False, k=10).eval()
+        model = train.SamplingRegionAggregator.load_from_checkpoint(ckpt_path,
+                                           k=500).eval()
+
     elif args.method == 'uniform':
         model = train.Uniform_model( args)
         model = model.load_from_checkpoint(ckpt_path,

@@ -14,7 +14,6 @@ import test_new
 def MSE(outputs, targets):
     
     losses = (outputs - targets)**2
-    losses = (torch.sum(losses, 1))
     losses = torch.mean(losses)
     
     return losses
@@ -22,8 +21,7 @@ def MSE(outputs, targets):
 def gaussLoss_train(mean, std, target):
     gauss = dist.Normal(mean, std)
     loss = gauss.log_prob(target)
-    loss = -(torch.sum(loss, 1))
-    loss = torch.mean(loss)
+    loss = -torch.mean(loss)
     return loss
 
 
@@ -55,23 +53,24 @@ class RegionAggregator(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
 
-        log_prob_orig = -test_new.gaussLoss_test(self.pred_Out(images)[0], 
-                                        self.pred_Out(images)[1],
-                                        self.flatten(labels))
+        # log_prob_orig = -test_new.gaussLoss_test(self.pred_Out(images)[0], 
+        #                                 self.pred_Out(images)[1],
+        #                                 self.flatten(labels))
         
-        labels = self.avg_pool(labels)*self.hparams.kernel_size**2
+        labels = self.avg_pool(labels)
         labels = self.flatten(labels)
         mu, std = self(images)
         
         
         mean_std = torch.mean(std)
-        log_prob = -test_new.gaussLoss_test(mu, std, labels)
+        # log_prob = -test_new.gaussLoss_test(mu, std, labels)
         
 
         loss = gaussLoss_train(mu, std, labels)
         
         return {'loss': loss, 'mean_std': mean_std, 
-                'log_prob': log_prob, 'log_prob_orig': log_prob_orig}
+                # 'log_prob': log_prob, 'log_prob_orig': log_prob_orig
+                }
 
 
     def training_step(self, batch, batch_idx):
@@ -79,8 +78,8 @@ class RegionAggregator(pl.LightningModule):
 
         self.log('train_loss', output['loss'])
         self.log('std', output['mean_std'])
-        self.log('log_prob', output['log_prob'])
-        self.log('log_prob_orig', output['log_prob_orig'])
+        # self.log('log_prob', output['log_prob'])
+        # self.log('log_prob_orig', output['log_prob_orig'])
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
@@ -130,19 +129,15 @@ class SamplingRegionAggregator(RegionAggregator):
         self.k = k
 
     def gaussian(self, mu, std):
-        sample = torch.zeros(self.k, mu.shape[0], mu.shape[1], mu.shape[2]).to('cuda')
-
         gauss_dist = dist.Normal(mu, std)
-
-        for i in range(self.k):
-            sample[i] = gauss_dist.rsample()
-        return sample
+        return gauss_dist.rsample((self.k,))
 
     def compute_per_region(self, sample):
-        est = self.avg_pool(sample) * self.hparams.kernel_size**2
+        est = self.avg_pool(sample)
         est = torch.flatten(est, 2, 3)
         mean_d = torch.mean(est, 0)
-        std_d = torch.std(est, 0)
+        var_d = torch.var(est, 0) * self.hparams.kernel_size ** 2
+        std_d = torch.sqrt(var_d)
         return mean_d, std_d
 
     def forward(self, x):
@@ -165,8 +160,8 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
-        means = self.avg_pool(mu)*self.hparams.kernel_size**2
-        var = self.avg_pool(std**2)*self.hparams.kernel_size**2
+        means = self.avg_pool(mu)
+        var = self.avg_pool(std**2)
 
         means = torch.flatten(means, 1, 2)
         std = torch.flatten(torch.sqrt(var), 1, 2)
@@ -210,8 +205,8 @@ class Uniform_model(pl.LightningModule):
        #                                 self.pred_Out(images)[1],
        #                                 self.flatten(labels))
 
-        labels = self.avg_pool(labels)*self.hparams.kernel_size**2
-        labels = labels / self.hparams.kernel_size**2
+        labels = self.avg_pool(labels)
+        labels = labels
         labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
         labels = labels.squeeze(1)
 
@@ -293,11 +288,11 @@ class deterministic_model(pl.LightningModule):
        #                                 self.pred_Out(images)[1],
        #                                 self.flatten(labels))
 
-        labels = self.avg_pool(labels)*self.hparams.kernel_size**2
+        labels = self.avg_pool(labels)
         labels = self.flatten(labels)
 
         net_out  = self(images)
-        net_out = self.avg_pool(net_out)*self.hparams.kernel_size**2
+        net_out = self.avg_pool(net_out)
         net_out = self.flatten(net_out)
 
         loss = MSE(net_out,labels)
@@ -350,7 +345,7 @@ def main(args):
     seed_everything(args.seed, workers=True)
 
     log_dir = '{}/{}/{}/{}/{}'.format(
-        args.seed,
+        'average',
         args.save_dir,
         args.method,
         args.kernel_size,

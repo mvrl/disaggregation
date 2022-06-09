@@ -101,8 +101,6 @@ class UniformModule(pl.LightningModule):
             model_state.update(pretrained_state)
             self.unet.load_state_dict(model_state)
 
-        self.loss = nn.L1Loss()
-
     def forward(self, x):
         x = self.unet(x)
         return x # B x 1 x H x W
@@ -141,6 +139,121 @@ class UniformModule(pl.LightningModule):
         output = self(batch['image']).squeeze(1)
         output = torch.mul(output,batch['total_parcel_mask'])
         loss = self.loss(output,batch['uniform_value_map'])
+        return {'loss': loss}
+
+    def training_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        return output['loss']
+
+    def validation_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
+        return output['loss']
+
+    def test_step(self, batch, batch_idx):
+        output = self.shared_step(batch)
+        self.log('test_loss', output['loss'], on_epoch = True)
+        return output['loss']
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
+
+class ProbUniformModule(pl.LightningModule):
+    def __init__(self,use_pretrained):
+        super().__init__()
+        self.unet = unet.UNet(in_channels=3, out_channels=2)
+
+        if(use_pretrained):
+            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
+
+            model_state = self.unet.state_dict()
+            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
+            model_state.update(pretrained_state)
+            self.unet.load_state_dict(model_state)
+
+        self.softplus = nn.Softplus()
+
+    def forward(self, x):
+        x = self.unet(x)
+        
+        means = x[:,0]
+        vars = x[:,1]
+        vars = self.softplus(vars)
+
+        #stay above 0s
+        vars = vars + torch.tensor(1e-16)
+
+        return means, vars # B x H x W ? 
+
+    def value_predictions(self, batch):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+        
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        return means_sums, values
+
+    def prob_eval(self, batch, boundary_val, boundary_val2):
+        image, masks, values = batch['image'], batch['masks'], batch['values']
+
+        means, vars = self(image)
+        # Shape: B X 1 X H X W
+
+        means = torch.flatten(means, start_dim=1)
+        vars = torch.flatten(vars, start_dim=1)
+        # Shape: B X 1 X HW
+
+        masks = torch.flatten(masks,start_dim = 2)
+        masks = torch.swapdims(masks,2,1)
+        # Shape: B X HW X 100 'max 100 parcels in a sample"
+
+        #Aggregate
+        means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
+        vars_sums = torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
+        #Shape: B X 100
+
+        #We need to ignore the zeroes
+        indices = means_sums.nonzero(as_tuple=True)
+        means_sums = means_sums[indices]
+        vars_sums = vars_sums[indices]
+        values = values[indices]
+        #Shape: num_parcels (IN ALL OF BATCH)
+
+        # build the distributions and take the log prob
+        gauss = dist.Normal(means_sums, torch.sqrt(vars_sums))
+        log_prob = gauss.log_prob(values)
+        metric = gauss.cdf(values + boundary_val) - gauss.cdf(values - boundary_val)
+        metric2 = gauss.cdf(values + boundary_val2) - gauss.cdf(values - boundary_val2)
+        return log_prob, metric, metric2, torch.sqrt(vars_sums)
+
+
+    def shared_step(self, batch):
+        image = batch['image']
+        means, vars = self(image)
+        gauss = dist.Normal(means, torch.sqrt(vars))
+        log_probs = gauss.log_prob(batch['uniform_value_map'])
+        log_probs = torch.mul(log_probs,batch['total_parcel_mask'])
+        loss = -torch.sum(log_probs, dim=1).mean()
         return {'loss': loss}
 
     def training_step(self, batch, batch_idx):
@@ -449,8 +562,9 @@ class LOGRSampleModule(pl.LightningModule):
 
         self.softplus = nn.Softplus()
 
-        self.one_sample_std = torch.nn.Parameter(torch.randn(1))
+        self.one_sample_std = torch.nn.Parameter(torch.tensor(5000.0))
         self.one_sample_std.requires_grad = True
+        
 
         self.num_samples = num_samples
 

@@ -44,7 +44,8 @@ def generate_images(model, num_images, dir_path):
             masks = masks[indices]
             value = value[indices]
 
-            if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
+            #probabilistic models
+            if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample' or cfg.train.model == 'uniform':
                 vals, vars = model(image)
                 stds = torch.sqrt(vars)
             else:
@@ -228,7 +229,7 @@ def generate_plot(image,vals, stds, pred_map,true_map, region_map, error, path):
     plt.close()
     #axs[0][1].set_title("Value Prediction")
 
-    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
+    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample' or cfg.train.model == 'uniform':
         plt.imshow(stds.permute(1,2,0), cmap = 'Reds')
         #plt.tight_layout(pad=0)
         plt.axis('off')

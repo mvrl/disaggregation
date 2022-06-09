@@ -58,7 +58,7 @@ def generate_pred_lists(model, dir_path):
                 print(estimated_values)
                 print(true_values)
 
-                if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
+                if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample' or cfg.train.model == 'uniform':
 
                     interval_val1 = torch.tensor(10000)
                     interval_val2 = torch.tensor(100000)
@@ -67,7 +67,7 @@ def generate_pred_lists(model, dir_path):
                     logs.extend(log.cpu().numpy().tolist())
                     metrics10k.extend(metric10k.cpu().numpy().tolist())
                     metrics100k.extend(metric100k.cpu().numpy().tolist())
-                    stds.extend(std.cpu().numpy().tolist())
+                    stds.append(std.cpu().numpy())
 
                 estimated_arr.extend( estimated_values.cpu().numpy().tolist())
                 value_arr.extend(true_values.numpy().tolist())
@@ -91,7 +91,7 @@ def generate_pred_lists(model, dir_path):
     mse_errors = np.power(mse_errors,2)
     
 
-    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample':
+    if cfg.train.model == 'gauss' or cfg.train.model == 'rsample' or cfg.train.model == 'logsample' or cfg.train.model == 'uniform':
         logs= np.array(logs)
         metrics10k = np.array(metrics10k)
         metrics100k = np.array(metrics100k)

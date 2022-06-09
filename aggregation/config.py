@@ -28,12 +28,11 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'logsample_1'
+cfg.experiment_name = 'logsample_1_fixed'
 
 cfg.train = edict()
 cfg.mode = 'train'
 cfg.train.model = 'logsample'
-
 cfg.train.use_pretrained = False
 
 cfg.train.patience = 100
@@ -47,5 +46,5 @@ cfg.train.batch_size = 8
 cfg.train.shuffle = True                 # shuffle training samples
 cfg.train.num_epochs = 300              # number of training epochs  ...
 cfg.train.num_workers = 4                # workers for data loading
-cfg.train.device_ids = [0]               # Train on two GPUs? Set True for blackbird
+cfg.train.device_ids = [1]               # Train on two GPUs? Set True for blackbird
 

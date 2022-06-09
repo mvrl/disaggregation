@@ -21,7 +21,7 @@ def chooseModel(model_name = cfg.train.model):
     if model_name == "ral":
         model = modules.RALModule(use_pretrained=cfg.train.use_pretrained)
     if model_name == "uniform":
-        model = modules.UniformModule(use_pretrained=cfg.train.use_pretrained)
+        model = modules.ProbUniformModule(use_pretrained=cfg.train.use_pretrained)
         #cfg.data.sample_mode = 'uniform'
     if(model_name == 'rsample'):
         model = modules.RSampleModule(use_pretrained=cfg.train.use_pretrained)

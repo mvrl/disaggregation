@@ -100,7 +100,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             'average/logtest/rsample/16/10/default/version_4/checkpoints/epoch=33-step=6459.ckpt')
+                             'average/logtest/analytical/8/10/default/version_2/checkpoints/epoch=28-step=5509.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)

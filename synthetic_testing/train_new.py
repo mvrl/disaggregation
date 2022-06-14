@@ -161,7 +161,7 @@ class AnalyticalRegionAggregator(RegionAggregator):
     def forward(self, x):
         mu, std = super().forward(x)
         means = self.avg_pool(mu)
-        var = self.avg_pool(std**2)
+        var = self.avg_pool(std**2) / (self.hparams.kernel_size**2)
 
         means = torch.flatten(means, 1, 2)
         std = torch.flatten(torch.sqrt(var), 1, 2)

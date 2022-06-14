@@ -445,6 +445,7 @@ class GaussModule(pl.LightningModule):
         variances_sums =  torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
         #Shape: B X 100
 
+
         #We need to ignore the zeroes
         indices = means_sums.nonzero(as_tuple=True)
         means_sums = means_sums[indices]
@@ -472,6 +473,9 @@ class GaussModule(pl.LightningModule):
         means_sums = torch.matmul(means.unsqueeze(1).float(), masks.float()).squeeze(1)
         vars_sums = torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
         #Shape: B X 100
+
+        #Covariance Peice
+        vars_sums = vars_sums * torch.count_nonzero(masks, dim=1)
 
         #We need to ignore the zeroes
         indices = means_sums.nonzero(as_tuple=True)
@@ -507,7 +511,9 @@ class GaussModule(pl.LightningModule):
         variances_sums =  torch.matmul(vars.unsqueeze(1).float(), masks.float()).squeeze(1)
         #Shape: B X 100
 
-        squares = torch.square(values.float()-means_sums)
+        #Covariance Peice
+        variances_sums = variances_sums * torch.count_nonzero(masks, dim=1)
+        
 
         #We need to ignore the zeroes
         indices = means_sums.nonzero(as_tuple=True)

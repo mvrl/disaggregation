@@ -67,7 +67,7 @@ def generate_pred_lists(model, dir_path):
                     logs.extend(log.cpu().numpy().tolist())
                     metrics10k.extend(metric10k.cpu().numpy().tolist())
                     metrics100k.extend(metric100k.cpu().numpy().tolist())
-                    stds.append(std.cpu().numpy())
+                    stds.extend(std.cpu().numpy())
 
                 estimated_arr.extend( estimated_values.cpu().numpy().tolist())
                 value_arr.extend(true_values.numpy().tolist())

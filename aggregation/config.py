@@ -28,11 +28,11 @@ cfg.data.hennepin.sample_mode = ''
 cfg.data.cutout_size = (302, 302)        # Used in visualizations
 
 
-cfg.experiment_name = 'logsample_1_fixed'
+cfg.experiment_name = 'gauss_covariance'
 
 cfg.train = edict()
 cfg.mode = 'train'
-cfg.train.model = 'logsample'
+cfg.train.model = 'gauss'
 cfg.train.use_pretrained = False
 
 cfg.train.patience = 100

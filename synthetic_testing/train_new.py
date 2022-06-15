@@ -57,7 +57,7 @@ class RegionAggregator(pl.LightningModule):
         #                                 self.pred_Out(images)[1],
         #                                 self.flatten(labels))
         
-        labels = self.avg_pool(labels)
+        labels = self.avg_pool(labels) * self.hparams.kernel_size**2
         labels = self.flatten(labels)
         mu, std = self(images)
         
@@ -160,9 +160,8 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
-        means = self.avg_pool(mu)
-        var = self.avg_pool(std**2) / (self.hparams.kernel_size**2)
-
+        means = self.avg_pool(mu) * self.hparams.kernel_size**2
+        var = (self.avg_pool(std) * self.hparams.kernel_size**2)**2
         means = torch.flatten(means, 1, 2)
         std = torch.flatten(torch.sqrt(var), 1, 2)
         return means, std

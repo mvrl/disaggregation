@@ -49,7 +49,7 @@ def generate_pred_lists(model, dir_path, method):
             value_arr.extend(labels[0].cpu().numpy().tolist())
 
             log = gaussLoss_test(estimated_values, std_values, labels).cpu().numpy().tolist()
-            print(log)
+            # print(log)
             logs.append(log)
 
             gauss = dist.Normal(estimated_values, std_values)
@@ -89,7 +89,7 @@ def generate_pred_lists(model, dir_path, method):
     #print (model.gauss_fit()[1], "gauss_std")
     #print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(0.5)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(0.5))))
     #print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(0.15)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(0.15))))
-    return mse_errors.mean(), log_error, ro15_mean,ro25_mean,ro35_mean,ro50_mean,ro1_mean,np.array(std_arr).mean()
+    return np.mean(mse_errors), log_error, ro15_mean,ro25_mean,ro35_mean,ro50_mean,ro1_mean,np.array(std_arr).mean()
 
 
 def main(args):
@@ -100,7 +100,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             'average/logtest/analytical/8/10/default/version_2/checkpoints/epoch=28-step=5509.ckpt')
+                             'average/logtest/analytical/16/10/default/version_5/checkpoints/epoch=114-step=21849.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)

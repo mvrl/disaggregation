@@ -1,5 +1,5 @@
 import torch
-from dataset import Eurosat
+from dataset import Eurosat,Cifar
 from tqdm import tqdm
 import os
 import train_new as train
@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-testset = Eurosat(mode='test')
+testset = Cifar(mode='test')
 
 def gaussLoss_test(mean, std, target):
     gauss = dist.Normal(mean, std)
-    loss = gauss.log_prob(target)
-    loss = -(torch.mean(loss, 1))
+    loss = -gauss.log_prob(target)
+    #loss = -(torch.mean(loss, 1))
     loss = torch.mean(loss)
     return loss
 
@@ -21,7 +21,7 @@ def generate_pred_lists(model, dir_path, method):
     test_loader = torch.utils.data.DataLoader(testset,
                                               batch_size=1,
                                               num_workers=8,
-                                              pin_memory=False
+                                              pin_memory=True
                                               )
 
     estimated_arr = []
@@ -40,25 +40,35 @@ def generate_pred_lists(model, dir_path, method):
 
             labels = sample['label']
             labels = torch.flatten(labels, 1, 2)
-
+    
             estimated_values, std_values = model.pred_Out(images)
+
+            
+            
            # estimated_values  = model.pred_Out(images)
 
-            estimated_arr.extend(estimated_values[0].cpu().numpy().tolist())
-            std_arr.extend(std_values[0].cpu().numpy().tolist())
-            value_arr.extend(labels[0].cpu().numpy().tolist())
+            
+
+            indices = labels.nonzero(as_tuple=True)
+            labels = labels[indices]
+            estimated_values = estimated_values[indices]
+            std_values = std_values[indices]
+
+            estimated_arr.extend(estimated_values.cpu().numpy().tolist())
+            std_arr.extend(std_values.cpu().numpy().tolist())
+            value_arr.extend(labels.cpu().numpy().tolist())
 
             log = gaussLoss_test(estimated_values, std_values, labels).cpu().numpy().tolist()
-            print(log)
             logs.append(log)
 
             gauss = dist.Normal(estimated_values, std_values)
 
-            ro15 = ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15))[0].cpu().numpy().tolist())
-            ro25 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25))[0].cpu().numpy().tolist())
-            ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35))[0].cpu().numpy().tolist())
-            ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5))[0].cpu().numpy().tolist())
-            ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.))[0].cpu().numpy().tolist())
+            ro15 = ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15)).cpu().numpy().tolist())
+            ro25 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25)).cpu().numpy().tolist())
+            ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35)).cpu().numpy().tolist())
+            ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5)).cpu().numpy().tolist())
+            ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.)).cpu().numpy().tolist())
+            #print(ro15)
             ros15.extend(ro15)
             ros25.extend(ro25)
             ros35.extend(ro35)
@@ -101,7 +111,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_10/checkpoints/epoch=47-step=9120.ckpt')
+                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_3/checkpoints/epoch=19-step=7820.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
@@ -132,7 +142,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
 
     parser.add_argument('--max_epochs', type=int, default=100)
-    parser.add_argument('--workers', type=int, default=8)
+    parser.add_argument('--workers', type=int, default=4)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logs')

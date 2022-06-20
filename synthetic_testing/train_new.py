@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.distributions as dist
 import torch.nn as nn
-from dataset import Eurosat
+from dataset import Eurosat,Cifar
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from unet import UNet
@@ -10,22 +10,20 @@ from argparse import ArgumentParser, Namespace
 from pytorch_lightning import seed_everything
 import test_new 
 
+def gaussLoss_train(mean, std, target):
+    gauss = dist.Normal(mean, std)
+    loss = -gauss.log_prob(target)
+    #loss = -(torch.sum(loss, 1))
+    loss = torch.mean(loss)
+    return loss
 
 def MSE(outputs, targets):
     
     losses = (outputs - targets)**2
-    losses = (torch.sum(losses, 1))
+    #losses = (torch.sum(losses, 1))
     losses = torch.mean(losses)
     
     return losses
-
-def gaussLoss_train(mean, std, target):
-    gauss = dist.Normal(mean, std)
-    loss = gauss.log_prob(target)
-    loss = -(torch.sum(loss, 1))
-    loss = torch.mean(loss)
-    return loss
-
 
 
 class RegionAggregator(pl.LightningModule):
@@ -38,27 +36,20 @@ class RegionAggregator(pl.LightningModule):
         self.unet = UNet(3, 2)
         self.softplus = nn.Softplus()
         self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
+        self.sum_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size, divisor_override = 1 )
         self.flatten = nn.Flatten()
-
-        self.trainset = Eurosat(mode='train')
-        self.valset = Eurosat(mode='validation')
+        self.trainset = Cifar(mode='train')
+        self.valset = Cifar(mode='validation')
         self.save_hyperparameters(hparams)
-
-    def pool(input, sum = False):
-        if(sum):
-            return self.avg_pool(input) * self.hparams.kernel_size**2
-        else:
-            return self.avg_pool(input)
-
 
     def forward(self, x):
         x = self.unet(x)
 
         mean = x[:, 0]
-        std = x[:, 1]
-        std = self.softplus(std) + 1e-16
+        var = x[:, 1]
+        var = self.softplus(var) + 1e-16
         
-        return mean, std
+        return mean, var
 
     def shared_step(self, batch):
         images = batch['image']
@@ -67,17 +58,20 @@ class RegionAggregator(pl.LightningModule):
         log_prob_orig = -test_new.gaussLoss_test(self.pred_Out(images)[0], 
                                         self.pred_Out(images)[1],
                                         self.flatten(labels))
+      
+        labels = self.sum_pool(labels)
         
-        labels = self.avg_pool(labels)*self.hparams.kernel_size**2
-        labels = self.flatten(labels)
-        mu, std = self(images)
-        
+        mu, var = self(images)
+        std = torch.sqrt(var)
         
         mean_std = torch.mean(std)
         log_prob = -test_new.gaussLoss_test(mu, std, labels)
         
+        #loss = gaussLoss_train(mu, std, labels)
 
-        loss = gaussLoss_train(mu, std, labels)
+        gauss = dist.Normal(mu, std)
+
+        loss = -torch.mean(gauss.log_prob(labels))
         
         return {'loss': loss, 'mean_std': mean_std, 
                 'log_prob': log_prob, 'log_prob_orig': log_prob_orig}
@@ -148,7 +142,7 @@ class SamplingRegionAggregator(RegionAggregator):
         return sample
 
     def compute_per_region(self, sample):
-        est = self.avg_pool(sample) * self.hparams.kernel_size**2
+        est = self.pool(sample, True)
         est = torch.flatten(est, 2, 3)
         mean_d = torch.mean(est, 0)
         std_d = torch.std(est, 0)
@@ -173,18 +167,17 @@ class AnalyticalRegionAggregator(RegionAggregator):
         super().__init__(hparams)
 
     def forward(self, x):
-        mu, std = super().forward(x)
-        means = self.avg_pool(mu)*self.hparams.kernel_size**2
-        var = self.avg_pool(std**2)*self.hparams.kernel_size**2
-
-        means = torch.flatten(means, 1, 2)
-        std = torch.flatten(torch.sqrt(var), 1, 2)
-        return means, std
+        mu, var = super().forward(x)
+        means = self.sum_pool(mu)
+        var = self.sum_pool(var)
+        #means = torch.flatten(means, 1, 2)
+        #std = torch.flatten(torch.sqrt(var), 1, 2)
+        return means, var
 
     def pred_Out(self, x):
-        means, std = super().forward(x)
+        means, var = super().forward(x)
         means = torch.flatten (means, 1,2)
-        std = torch.flatten (std, 1,2)
+        std = torch.flatten (torch.sqrt(var), 1,2)
         return means, std
 
 class Uniform_model(pl.LightningModule):
@@ -198,18 +191,18 @@ class Uniform_model(pl.LightningModule):
         self.softplus = nn.Softplus()
         self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
         self.flatten = nn.Flatten()
-        self.trainset = Eurosat(mode='train')
-        self.valset = Eurosat(mode='validation')
+        self.trainset = Cifar(mode='train')
+        self.valset = Cifar(mode='validation')
         self.save_hyperparameters(hparams)
 
     def forward(self, x):
         x = self.unet(x)
 
         mean = x[:, 0]  
-        std = x[:, 1] 
-        std = self.softplus(std) + 1e-16
+        var = x[:, 1] 
+        var = self.softplus(var) + 1e-16
 
-        return mean, std
+        return mean, var
 
     def shared_step(self, batch):
         images = batch['image']
@@ -223,11 +216,20 @@ class Uniform_model(pl.LightningModule):
         labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
         labels = labels.squeeze(1)
 
-        mu, std = self(images)
+        mu, var = self(images)
+
+        #print(mean_sums.shape)
+
+        std = torch.sqrt(var)
 
         mean_std = torch.mean(std)
 
-        loss = gaussLoss_train(mu, std, labels)
+        #loss = gaussLoss_train(mu, std, labels)
+        gauss = dist.Normal(mu, std)
+
+        loss = -torch.mean(gauss.log_prob(labels))
+
+        #perPixel_loss = -torch.mean(gauss.log_prob(true_labels))
 
         return {'loss': loss, 'mean_std': mean_std}
 
@@ -266,9 +268,9 @@ class Uniform_model(pl.LightningModule):
 
     
     def pred_Out(self, x):
-        means, std = self(x)
+        means, var = self(x)
         means = torch.flatten (means, 1,2)
-        std = torch.flatten (std, 1,2)
+        std = torch.flatten (torch.sqrt(var), 1,2)
         return means, std
 
 
@@ -392,13 +394,13 @@ def main(args):
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument('--max_epochs', type=int, default=150)
+    parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--workers', type=int, default=8)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logtest')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=16)
+    parser.add_argument('--kernel_size', type=int, default=8)
     parser.add_argument('--samples', type=int, default=10)
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)

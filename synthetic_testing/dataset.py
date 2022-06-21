@@ -1,3 +1,4 @@
+from matplotlib import image
 from torch.utils.data import Dataset
 from PIL import Image
 import torch
@@ -18,8 +19,8 @@ import numpy as np
 def prep_y_simple(X, centroids):
     """ Creates a simple target Y tensor, in this case, binary."""
     N,d,h,w = X.shape
-    num_centroids = 10
-    threshold = 0.05
+    num_centroids = 1
+    threshold = 0.02
     seed = 0
     rng = check_random_state(seed)
     color_vecs = X.permute(0,2,3,1).reshape(-1,3)
@@ -32,7 +33,7 @@ def prep_y_simple(X, centroids):
 def get_centroids():
     """ Creates a simple target Y tensor, in this case, binary."""
     shape = 1024 # HARDCODED
-    num_centroids = 10
+    num_centroids = 1
     seed = 0
     rng = check_random_state(seed)
     centroids = rng.choice(shape,num_centroids)
@@ -92,7 +93,7 @@ class Eurosat(torch.utils.data.Dataset):
 
 class Cifar(Dataset):
     def __init__(self, mode):
-        self.transform = transforms.Compose([transforms.ToTensor()])
+        self.totnsr = transforms.ToTensor()
 
         self.dataset = []
 
@@ -100,9 +101,27 @@ class Cifar(Dataset):
 
         if(self.mode == 'train'):
             self.dataset = torchvision.datasets.CIFAR10(root = './', train=True, download=True, transform=None)
-        else:
+            self.transform = A.Compose([
+              A.HorizontalFlip(p=0.5),
+              A.RandomRotate90(p=1.0),
+              A.NoOp()
+            ])
+        elif mode == 'test':
             self.dataset = torchvision.datasets.CIFAR10(root = './', train=False, download=True, transform=None)
-            
+            test_set, val_set = train_test_split(self.dataset, test_size=0.5, stratify=self.dataset.targets, random_state=42)
+            self.dataset = test_set
+            self.transform = A.Compose([
+              A.NoOp()
+            ])
+        elif mode == 'validation':
+            self.dataset = torchvision.datasets.CIFAR10(root = './', train=False, download=True, transform=None)
+            test_set, val_set= train_test_split(self.dataset, test_size=0.5, stratify=self.dataset.targets, random_state=42)
+            self.dataset = val_set
+            self.transform = A.Compose([
+              A.NoOp()
+            ])
+
+
         self.centroids = get_centroids()
 
         self.max_regions = 10
@@ -113,7 +132,9 @@ class Cifar(Dataset):
     def __getitem__(self, idx):
         sample = self.dataset[idx]
         
-        image_tensor = self.transform(sample[0])
+        image_tensor = self.transform(image = np.array(sample[0]))
+        image_tensor = self.totnsr(image_tensor['image'])
+
         Y = prep_y_simple(image_tensor.unsqueeze(0), self.centroids)
         Y = torch.tensor(Y).squeeze(0).squeeze(0)
 

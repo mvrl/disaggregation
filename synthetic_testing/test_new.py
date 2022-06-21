@@ -10,6 +10,7 @@ from PIL import Image
 
 testset = Cifar(mode='test')
 
+
 def gaussLoss_test(mean, std, target):
     gauss = dist.Normal(mean, std)
     loss = -gauss.log_prob(target)
@@ -45,14 +46,14 @@ def generate_pred_lists(model, dir_path, method):
 
             
             
-           # estimated_values  = model.pred_Out(images)
-
-            
+            # estimated_values  = model.pred_Out(images)
 
             indices = labels.nonzero(as_tuple=True)
             labels = labels[indices]
             estimated_values = estimated_values[indices]
             std_values = std_values[indices]
+
+            #print(estimated_values)
 
             estimated_arr.extend(estimated_values.cpu().numpy().tolist())
             std_arr.extend(std_values.cpu().numpy().tolist())
@@ -63,11 +64,11 @@ def generate_pred_lists(model, dir_path, method):
 
             gauss = dist.Normal(estimated_values, std_values)
 
-            ro15 = ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15)).cpu().numpy().tolist())
-            ro25 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25)).cpu().numpy().tolist())
-            ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35)).cpu().numpy().tolist())
-            ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5)).cpu().numpy().tolist())
-            ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.)).cpu().numpy().tolist())
+            ro15 = ((gauss.cdf(labels + 0.05) - gauss.cdf(labels - 0.05)).cpu().numpy().tolist())
+            ro25 = ((gauss.cdf(labels + 0.1) - gauss.cdf(labels - 0.1)).cpu().numpy().tolist())
+            ro35 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25)).cpu().numpy().tolist())
+            ro50 = ((gauss.cdf(labels + 0.33) - gauss.cdf(labels - 0.33)).cpu().numpy().tolist())
+            ro1 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5)).cpu().numpy().tolist())
             #print(ro15)
             ros15.extend(ro15)
             ros25.extend(ro25)
@@ -111,7 +112,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_3/checkpoints/epoch=19-step=7820.ckpt')
+                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/4/10/lightning_logs/version_7/checkpoints/epoch=241-step=94622.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
@@ -130,8 +131,8 @@ def main(args):
 
     test_file = open(test_file_path, "a")
     L = ["\nStats 10: " + str(args.method), "\nMSE: " + str(mse_error),
-         "\nAverage Log Prob: " + str(log_error), "\nro15: " + str(ro15),"\nro25: " + str(ro25), 
-         "\nro35: " + str(ro35),"\nro50: " + str(ro50),"\nro1: " + str(ro1),"\nstd: " + str(std)]
+         "\nAverage Log Prob: " + str(log_error), "\nro05: " + str(ro15),"\nro10: " + str(ro25), 
+         "\nro25: " + str(ro35),"\nro33: " + str(ro50),"\nro0.5: " + str(ro1),"\nstd: " + str(std)]
 
     test_file.writelines(L)
 
@@ -147,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logs')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=16)
+    parser.add_argument('--kernel_size', type=int, default=4)
     parser.add_argument('--patience', type=int, default=100)
 
     parser.add_argument('--method', type=str, default='analytical')

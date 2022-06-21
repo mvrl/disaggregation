@@ -63,13 +63,20 @@ class RegionAggregator(pl.LightningModule):
         
         mu, var = self(images)
         std = torch.sqrt(var)
-        
+
+        indices = labels.nonzero(as_tuple=True)
+        labels = labels[indices]
+        mu = mu[indices]
+        std = std[indices]
+
         mean_std = torch.mean(std)
         log_prob = -test_new.gaussLoss_test(mu, std, labels)
         
         #loss = gaussLoss_train(mu, std, labels)
 
         gauss = dist.Normal(mu, std)
+
+        log_probs = gauss.log_prob(labels)
 
         loss = -torch.mean(gauss.log_prob(labels))
         
@@ -213,7 +220,7 @@ class Uniform_model(pl.LightningModule):
        #                                 self.flatten(labels))
 
         labels = self.avg_pool(labels)
-        labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
+        labels = torch.nn.functional.interpolate(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
         labels = labels.squeeze(1)
 
         mu, var = self(images)
@@ -221,14 +228,16 @@ class Uniform_model(pl.LightningModule):
         #print(mean_sums.shape)
 
         std = torch.sqrt(var)
-
         mean_std = torch.mean(std)
 
         #loss = gaussLoss_train(mu, std, labels)
         gauss = dist.Normal(mu, std)
 
-        loss = -torch.mean(gauss.log_prob(labels))
+        log_probs = gauss.log_prob(labels)
 
+        log_probs = log_probs * (labels > 0)
+
+        loss = -torch.sum(log_probs, dim=1).mean()
         #perPixel_loss = -torch.mean(gauss.log_prob(true_labels))
 
         return {'loss': loss, 'mean_std': mean_std}
@@ -400,12 +409,12 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logtest')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=8)
+    parser.add_argument('--kernel_size', type=int, default=4)
     parser.add_argument('--samples', type=int, default=10)
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)
 
-    parser.add_argument('--method', type=str, default='uniform')
+    parser.add_argument('--method', type=str, default='analytical')
     parser.add_argument('--lambdaa', type=float, default=0.)
     args = parser.parse_args()
     main(args)

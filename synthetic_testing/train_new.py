@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.distributions as dist
 import torch.nn as nn
-from dataset import Eurosat
+from dataset_1 import Eurosat
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from unet import UNet
@@ -22,8 +22,8 @@ def MSE(outputs, targets):
 def gaussLoss_train(mean, std, target):
     gauss = dist.Normal(mean, std)
     loss = gauss.log_prob(target)
-    loss = -(torch.sum(loss, 1))
-    loss = torch.mean(loss)
+   # loss = -(torch.sum(loss, 1))
+    loss = -torch.mean(loss) #+ 10*gauss.entropy().mean()
     return loss
 
 
@@ -54,21 +54,23 @@ class RegionAggregator(pl.LightningModule):
     def shared_step(self, batch):
         images = batch['image']
         labels = batch['label']
-
         log_prob_orig = -test_new.gaussLoss_test(self.pred_Out(images)[0], 
                                         self.pred_Out(images)[1],
                                         self.flatten(labels))
         
         labels = self.avg_pool(labels)*self.hparams.kernel_size**2
         labels = self.flatten(labels)
-        mu, std = self(images)
-        
+        mu, std, entropy = self(images)
+       # print (abs(mu-labels), "l1")
+       # print (std, "std")
+        #print (mu.mean(), "mu")
+
         
         mean_std = torch.mean(std)
         log_prob = -test_new.gaussLoss_test(mu, std, labels)
         
 
-        loss = gaussLoss_train(mu, std, labels)
+        loss = gaussLoss_train(mu, std, labels) + 2*entropy
         
         return {'loss': loss, 'mean_std': mean_std, 
                 'log_prob': log_prob, 'log_prob_orig': log_prob_orig}
@@ -133,10 +135,11 @@ class SamplingRegionAggregator(RegionAggregator):
         sample = torch.zeros(self.k, mu.shape[0], mu.shape[1], mu.shape[2]).to('cuda')
 
         gauss_dist = dist.Normal(mu, std)
+        entropy = -torch.mean(gauss_dist.entropy())
 
         for i in range(self.k):
             sample[i] = gauss_dist.rsample()
-        return sample
+        return sample, entropy
 
     def compute_per_region(self, sample):
         est = self.avg_pool(sample) * self.hparams.kernel_size**2
@@ -147,9 +150,9 @@ class SamplingRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
-        sample = self.gaussian(mu, std)
+        sample, entropy = self.gaussian(mu, std)
         mean, std = self.compute_per_region(sample)
-        return mean, std
+        return mean, std, entropy
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -165,12 +168,16 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
+        
+        gauss_dist = dist.Normal(mu, std)
+        entropy = torch.mean(gauss_dist.entropy())
+        
         means = self.avg_pool(mu)*self.hparams.kernel_size**2
         var = self.avg_pool(std**2)*self.hparams.kernel_size**2
 
         means = torch.flatten(means, 1, 2)
         std = torch.flatten(torch.sqrt(var), 1, 2)
-        return means, std
+        return means, std, entropy
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -216,10 +223,13 @@ class Uniform_model(pl.LightningModule):
         labels = labels.squeeze(1)
 
         mu, std = self(images)
+        gauss_dist = dist.Normal(mu, std)
+        entropy = -torch.mean(gauss_dist.entropy())
+       # print (std, "std`")
 
         mean_std = torch.mean(std)
 
-        loss = gaussLoss_train(mu, std, labels)
+        loss = gaussLoss_train(mu, std, labels)+ entropy
 
         return {'loss': loss, 'mean_std': mean_std}
 
@@ -274,6 +284,7 @@ class deterministic_model(pl.LightningModule):
 
         self.unet = UNet(3, 1)
         self.softplus = nn.Softplus()
+        self.sigmoid = nn.Sigmoid()
         self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
         self.flatten = nn.Flatten()
         self.trainset = Eurosat(mode='train')

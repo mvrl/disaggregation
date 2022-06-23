@@ -19,11 +19,11 @@ def MSE(outputs, targets):
     
     return losses
 
-def gaussLoss_train(mean, std, target):
+def gaussLoss_train(mean, std, target, entropy):
     gauss = dist.Normal(mean, std)
-    loss = gauss.log_prob(target)
-   # loss = -(torch.sum(loss, 1))
-    loss = -torch.mean(loss) #+ 10*gauss.entropy().mean()
+    loss = gauss.log_prob(target) 
+    loss = -(torch.mean(loss, 1)) + torch.mean(entropy,1) * 10
+    loss = torch.mean(loss)
     return loss
 
 
@@ -70,7 +70,7 @@ class RegionAggregator(pl.LightningModule):
         log_prob = -test_new.gaussLoss_test(mu, std, labels)
         
 
-        loss = gaussLoss_train(mu, std, labels) + 2*entropy
+        loss = gaussLoss_train(mu, std, labels,entropy)
         
         return {'loss': loss, 'mean_std': mean_std, 
                 'log_prob': log_prob, 'log_prob_orig': log_prob_orig}
@@ -170,13 +170,15 @@ class AnalyticalRegionAggregator(RegionAggregator):
         mu, std = super().forward(x)
         
         gauss_dist = dist.Normal(mu, std)
-        entropy = torch.mean(gauss_dist.entropy())
-        
+        entropy = (gauss_dist.entropy())
+
         means = self.avg_pool(mu)*self.hparams.kernel_size**2
         var = self.avg_pool(std**2)*self.hparams.kernel_size**2
+        entropy = self.avg_pool(entropy)*self.hparams.kernel_size**2
 
         means = torch.flatten(means, 1, 2)
         std = torch.flatten(torch.sqrt(var), 1, 2)
+        entropy = torch.flatten(entropy, 1, 2)
         return means, std, entropy
 
     def pred_Out(self, x):

@@ -112,7 +112,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/4/10/lightning_logs/version_7/checkpoints/epoch=241-step=94622.ckpt')
+                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/2/10/lightning_logs/version_0/checkpoints/epoch=118-step=46529.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)

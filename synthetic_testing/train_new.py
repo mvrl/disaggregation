@@ -409,7 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logtest')
     parser.add_argument('--gpus', type=int, default=1)
-    parser.add_argument('--kernel_size', type=int, default=4)
+    parser.add_argument('--kernel_size', type=int, default=1)
     parser.add_argument('--samples', type=int, default=10)
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)

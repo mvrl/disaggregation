@@ -46,7 +46,7 @@ class RegionAggregator(pl.LightningModule):
 
         mean = x[:, 0]
         std = x[:, 1]
-        std = self.softplus(std) + 1e-16
+        std = self.softplus(std) #+ 1e-16
         
         return mean, std
 
@@ -59,7 +59,8 @@ class RegionAggregator(pl.LightningModule):
         
         labels = self.sum_pool(labels)
         #labels = self.flatten(labels)
-        mu, std = self(images)
+        mu, std, entropy = self(images)
+        print(entropy.mean())
        # print (abs(mu-labels), "l1")
        # print (std, "std")
         #print (mu.mean(), "mu")
@@ -70,7 +71,7 @@ class RegionAggregator(pl.LightningModule):
         gauss = dist.Normal(mu, std)
 
         log_prob = -torch.mean(gauss.log_prob(labels))
-        loss = log_prob + 10 * gauss.entropy().mean()
+        loss = log_prob + entropy.mean()
         #loss = gaussLoss_train(mu, std, labels,entropy)
         
         return {'loss': loss, 'mean_std': mean_std, 
@@ -152,11 +153,11 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
-
+        entropy = dist.Normal(mu,std).entropy()
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
     
-        return means, torch.sqrt(var)
+        return means, torch.sqrt(var), entropy
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -184,6 +185,7 @@ class Uniform_model(pl.LightningModule):
         mean = x[:, 0]  
         std = x[:, 1] 
         std = self.softplus(std) + 1e-16
+        mean = mean + 1e-16
 
         return mean, std
 
@@ -403,7 +405,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)
 
-    parser.add_argument('--method', type=str, default='uniform')
+    parser.add_argument('--method', type=str, default='analytical')
     parser.add_argument('--lambdaa', type=float, default=0.)
     args = parser.parse_args()
     main(args)

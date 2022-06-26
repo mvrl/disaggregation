@@ -14,7 +14,7 @@ import torch
 class Eurosat(torch.utils.data.Dataset):
    
     
-    def __init__(self, mode='train', root='/localdisk0/SCRATCH/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
+    def __init__(self, mode='train', root='/localdisk0/data/EuroSatMS/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
         data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
 
         if mode == 'train':

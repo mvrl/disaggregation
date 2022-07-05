@@ -13,21 +13,16 @@ import torch
 
 class Eurosat(torch.utils.data.Dataset):
    
-<<<<<<< HEAD
-    def __init__(self, mode='train', root='/localdisk0/SCRATCH/watch/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
-=======
-    
-    def __init__(self, mode='train', root='/localdisk0/data/EuroSatMS/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
->>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
+    def __init__(self, mode='train', root='/u/eag-d1/data/Hennepin/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
         data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
 
         if mode == 'train':
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
-             #  A.HorizontalFlip(p=0.5),
-             #  A.RandomRotate90(p=1.0),
-              A.NoOp()
+            A.HorizontalFlip(p=0.5),
+            A.RandomRotate90(p=1.0),
+            A.NoOp()
             ],
             )
         elif mode == 'test' or mode == 'validation':

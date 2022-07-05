@@ -9,6 +9,7 @@ from unet import UNet
 from argparse import ArgumentParser, Namespace
 from pytorch_lightning import seed_everything
 
+
 class RegionAggregator(pl.LightningModule):
     def __init__(self, hparams):
         super().__init__()
@@ -95,7 +96,7 @@ class AnalyticalRegionAggregator(RegionAggregator):
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
     
-        return means, torch.sqrt(var), gauss.entropy()
+        return means, torch.sqrt(var)
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -179,8 +180,6 @@ class Uniform_model(pl.LightningModule):
     
     def pred_Out(self, x):
         means, std = self(x)
-        means = torch.flatten (means, 1,2)
-        std = torch.flatten (std, 1,2)
         return means, std
 
 
@@ -240,7 +239,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--max_epochs', type=int, default=300)
     parser.add_argument('--workers', type=int, default=4)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--learning_rate', type=float, default=.001)
     parser.add_argument('--save_dir', default='logtest')
     parser.add_argument('--gpus', type=int, default=1)

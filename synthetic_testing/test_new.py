@@ -57,6 +57,7 @@ def generate_pred_lists(model, dir_path, method):
             ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35))[0].cpu().numpy().tolist())
             ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5))[0].cpu().numpy().tolist())
             ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.))[0].cpu().numpy().tolist())
+            
             ros15.extend(ro15)
             ros25.extend(ro25)
             ros35.extend(ro35)
@@ -99,7 +100,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_11/checkpoints/epoch=263-step=50160.ckpt')
+                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_46/checkpoints/epoch=61-step=11780.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)

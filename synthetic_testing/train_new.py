@@ -8,24 +8,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from unet import UNet
 from argparse import ArgumentParser, Namespace
 from pytorch_lightning import seed_everything
-import test_new 
-
-
-def MSE(outputs, targets):
-    
-    losses = (outputs - targets)**2
-    losses = (torch.sum(losses, 1))
-    losses = torch.mean(losses)
-    
-    return losses
-
-def gaussLoss_train(mean, std, target, entropy):
-    gauss = dist.Normal(mean, std)
-    loss = gauss.log_prob(target) 
-    loss = -(torch.mean(loss, 1)) + torch.mean(entropy,1) * 10
-    loss = torch.mean(loss)
-    return loss
-
 
 class RegionAggregator(pl.LightningModule):
     def __init__(self, hparams):
@@ -41,40 +23,30 @@ class RegionAggregator(pl.LightningModule):
         self.flatten = nn.Flatten()
 
         self.save_hyperparameters(hparams)
+
     def forward(self, x):
         x = self.unet(x)
 
         mean = x[:, 0]
         std = x[:, 1]
-        std = self.softplus(std) + 1e-16
+        std = self.softplus(std) + 1e-8
         
         return mean, std
 
     def shared_step(self, batch):
         images = batch['image']
         labels = batch['label']
-        #log_prob_orig = -test_new.gaussLoss_test(self.pred_Out(images)[0], 
-        #                                self.pred_Out(images)[1],
-        #                                self.flatten(labels))
         
         labels = self.sum_pool(labels)
-        #labels = self.flatten(labels)
         mu, std = self(images)
-       # print (abs(mu-labels), "l1")
-       # print (std, "std")
-        #print (mu.mean(), "mu")
 
-        
         mean_std = torch.mean(std)
-        #log_prob = -test_new.gaussLoss_test(mu, std, labels)
         gauss = dist.Normal(mu, std)
-
-        log_prob = -torch.mean(gauss.log_prob(labels))
-        loss = log_prob + 10 * gauss.entropy().mean()
-        #loss = gaussLoss_train(mu, std, labels,entropy)
+        log_prob = -gauss.log_prob(labels)
+        loss = torch.mean(log_prob)
         
         return {'loss': loss, 'mean_std': mean_std, 
-                'log_prob': log_prob}
+                'log_prob': torch.mean(log_prob)}
 
 
     def training_step(self, batch, batch_idx):
@@ -110,40 +82,6 @@ class RegionAggregator(pl.LightningModule):
         gauss = torch.distributions.Normal(mean,std)
         return mean, std, gauss
 
-class SamplingRegionAggregator(RegionAggregator):
-
-    def __init__(self, k: int, hparams):
-        super().__init__(hparams)
-        self.k = k
-
-    def gaussian(self, mu, std):
-        sample = torch.zeros(self.k, mu.shape[0], mu.shape[1], mu.shape[2]).to('cuda')
-
-        gauss_dist = dist.Normal(mu, std)
-
-        for i in range(self.k):
-            sample[i] = gauss_dist.rsample()
-        return sample
-
-    def compute_per_region(self, sample):
-        est = self.sum_pool(sample)
-        #est = torch.flatten(est, 2, 3)
-        mean_d = torch.mean(est, 0)
-        std_d = torch.std(est, 0)
-        return mean_d, std_d
-
-    def forward(self, x):
-        mu, std = super().forward(x)
-        sample = self.gaussian(mu, std)
-        mean, std = self.compute_per_region(sample)
-        return mean, std
-
-    def pred_Out(self, x):
-        means, std = super().forward(x)
-        means = torch.flatten (means, 1,2)
-        std = torch.flatten (std, 1,2)
-        return means, std
-
 
 class AnalyticalRegionAggregator(RegionAggregator):
 
@@ -152,11 +90,12 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
+        gauss = dist.Normal(mu, std)
 
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
     
-        return means, torch.sqrt(var)
+        return means, torch.sqrt(var), gauss.entropy()
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -183,7 +122,7 @@ class Uniform_model(pl.LightningModule):
 
         mean = x[:, 0]  
         std = x[:, 1] 
-        std = self.softplus(std) + 1e-16
+        std = self.softplus(std) + 1e-8
 
         return mean, std
 
@@ -191,26 +130,17 @@ class Uniform_model(pl.LightningModule):
         images = batch['image']
         labels = batch['label']
 
-       # log_prob_orig = -gaussLoss_test(self.pred_Out(images)[0],
-       #                                 self.pred_Out(images)[1],
-       #                                 self.flatten(labels))
-
         labels = self.avg_pool(labels)
         labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
         labels = labels.squeeze(1)
 
         mu, std = self(images)
         gauss = dist.Normal(mu, std)
-        #entropy = self.sum_pool(gauss_dist.entropy())
-
-        # print (std, "std`")
 
         mean_std = torch.mean(std)
 
-        loss = -torch.mean(gauss.log_prob(labels)) + 10 *  gauss.entropy().mean()
-
-        #loss = gaussLoss_train(mu, std, labels)#+ entropy
-
+        loss = -torch.mean(gauss.log_prob(labels))
+    
         return {'loss': loss, 'mean_std': mean_std}
 
 
@@ -254,86 +184,6 @@ class Uniform_model(pl.LightningModule):
         return means, std
 
 
-
-class deterministic_model(pl.LightningModule):
-    def __init__(self, hparams):
-        super().__init__()
-
-        if type(hparams) == dict:
-            hparams = Namespace(**hparams)
-
-        self.unet = UNet(3, 1)
-        self.softplus = nn.Softplus()
-        self.sigmoid = nn.Sigmoid()
-        self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
-        self.flatten = nn.Flatten()
-        self.trainset = Eurosat(mode='train')
-        self.valset = Eurosat(mode='validation')
-        self.save_hyperparameters(hparams)
-
-    def forward(self, x):
-        x = self.unet(x)
-
-        return x
-
-    def shared_step(self, batch):
-        images = batch['image']
-        labels = batch['label']
-
-       # log_prob_orig = -gaussLoss_test(self.pred_Out(images)[0],
-       #                                 self.pred_Out(images)[1],
-       #                                 self.flatten(labels))
-
-        labels = self.avg_pool(labels)*self.hparams.kernel_size**2
-        labels = self.flatten(labels)
-
-        net_out  = self(images)
-        net_out = self.avg_pool(net_out)*self.hparams.kernel_size**2
-        net_out = self.flatten(net_out)
-
-        loss = MSE(net_out,labels)
-
-        return {'loss': loss}
-
-
-    def training_step(self, batch, batch_idx):
-        output = self.shared_step(batch)
-
-        self.log('train_loss', output['loss'])
-        return output['loss']
-
-    def validation_step(self, batch, batch_idx):
-        output = self.shared_step(batch)
-        self.log('val_loss', output['loss'])
-        return output['loss']
-
-    def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.trainset,
-                                           batch_size=self.hparams.batch_size,
-                                           num_workers=self.hparams.workers,
-                                           shuffle=True,
-                                           pin_memory=False
-                                           )
-
-    def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.valset,
-                                           batch_size=self.hparams.batch_size,
-                                           num_workers=self.hparams.workers,
-                                           pin_memory=False
-                                           )
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
-
-        return {'optimizer': optimizer}
-
-    
-    def pred_Out(self, x):
-        net_out = self(x)
-        net_out = self.flatten (net_out)
-        return net_out
-
-
 def main(args):
     if type(args) == dict:
         args = Namespace(**args)
@@ -352,12 +202,8 @@ def main(args):
 
     if args.method == 'analytical':
         model = AnalyticalRegionAggregator(args)
-    elif args.method == 'rsample':
-        model = SamplingRegionAggregator(args.samples, args)
     elif args.method == 'uniform':
         model = Uniform_model(args)
-    elif args.method == 'det':
-        model = deterministic_model(args)
     
     checkpoint_callback = ModelCheckpoint(monitor='val_loss', mode='min', save_top_k=1)
 
@@ -393,8 +239,8 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument('--max_epochs', type=int, default=300)
-    parser.add_argument('--workers', type=int, default=16)
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--learning_rate', type=float, default=.001)
     parser.add_argument('--save_dir', default='logtest')
     parser.add_argument('--gpus', type=int, default=1)
@@ -403,7 +249,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)
 
-    parser.add_argument('--method', type=str, default='uniform')
+    parser.add_argument('--method', type=str, default='analytical')
     parser.add_argument('--lambdaa', type=float, default=0.)
     args = parser.parse_args()
     main(args)

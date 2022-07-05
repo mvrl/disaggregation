@@ -29,7 +29,11 @@ class RegionAggregator(pl.LightningModule):
 
         mean = x[:, 0]
         std = x[:, 1]
+<<<<<<< HEAD
         std = self.softplus(std) + 1e-8
+=======
+        std = self.softplus(std) #+ 1e-16
+>>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
         
         return mean, std
 
@@ -38,12 +42,28 @@ class RegionAggregator(pl.LightningModule):
         labels = batch['label']
         
         labels = self.sum_pool(labels)
+<<<<<<< HEAD
         mu, std = self(images)
+=======
+        #labels = self.flatten(labels)
+        mu, std, entropy = self(images)
+        print(entropy.mean())
+       # print (abs(mu-labels), "l1")
+       # print (std, "std")
+        #print (mu.mean(), "mu")
+>>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
 
         mean_std = torch.mean(std)
         gauss = dist.Normal(mu, std)
+<<<<<<< HEAD
         log_prob = -gauss.log_prob(labels)
         loss = torch.mean(log_prob)
+=======
+
+        log_prob = -torch.mean(gauss.log_prob(labels))
+        loss = log_prob + entropy.mean()
+        #loss = gaussLoss_train(mu, std, labels,entropy)
+>>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
         
         return {'loss': loss, 'mean_std': mean_std, 
                 'log_prob': torch.mean(log_prob)}
@@ -90,12 +110,20 @@ class AnalyticalRegionAggregator(RegionAggregator):
 
     def forward(self, x):
         mu, std = super().forward(x)
+<<<<<<< HEAD
         gauss = dist.Normal(mu, std)
 
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
     
         return means, torch.sqrt(var), gauss.entropy()
+=======
+        entropy = dist.Normal(mu,std).entropy()
+        means = self.sum_pool(mu)
+        var = self.sum_pool(std**2)
+    
+        return means, torch.sqrt(var), entropy
+>>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -122,7 +150,12 @@ class Uniform_model(pl.LightningModule):
 
         mean = x[:, 0]  
         std = x[:, 1] 
+<<<<<<< HEAD
         std = self.softplus(std) + 1e-8
+=======
+        std = self.softplus(std) + 1e-16
+        mean = mean + 1e-16
+>>>>>>> 798787e5ac3c6a7670a21ee0d6b6657f44c2579b
 
         return mean, std
 

@@ -11,14 +11,6 @@ from pytorch_lightning import seed_everything
 import test_new 
 
 
-def MSE(outputs, targets):
-    
-    losses = (outputs - targets)**2
-    losses = (torch.sum(losses, 1))
-    losses = torch.mean(losses)
-    
-    return losses
-
 def gaussLoss_train(mean, std, target, entropy):
     gauss = dist.Normal(mean, std)
     loss = gauss.log_prob(target) 
@@ -412,4 +404,3 @@ if __name__ == '__main__':
     parser.add_argument('--lambdaa', type=float, default=0.)
     args = parser.parse_args()
     main(args)
-

@@ -21,7 +21,12 @@ class Eurosat(torch.utils.data.Dataset):
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
+<<<<<<< HEAD
                A.HorizontalFlip(p=0.5),
+=======
+              A.HorizontalFlip(p=0.5),
+              A.NoOp()
+>>>>>>> a45cbf1ea9f20f2ef57a0d7b1871841e8e5f6c16
             ],
             )
         elif mode == 'test' or mode == 'validation':

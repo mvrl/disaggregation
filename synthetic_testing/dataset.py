@@ -21,8 +21,7 @@ class Eurosat(torch.utils.data.Dataset):
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
-             #  A.HorizontalFlip(p=0.5),
-             #  A.RandomRotate90(p=1.0),
+              A.HorizontalFlip(p=0.5),
               A.NoOp()
             ],
             )

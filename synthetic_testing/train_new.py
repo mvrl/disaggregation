@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.distributions as dist
 import torch.nn as nn
-from dataset import Eurosat
+from dataset import Eurosat, dataset_cifar
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from unet import UNet
@@ -17,7 +17,7 @@ class RegionAggregator(pl.LightningModule):
         if type(hparams) == dict:
             hparams = Namespace(**hparams)
 
-        self.unet = UNet(3, 2)
+        self.unet = nn.Conv2d(3, 2, (1,1))
         self.softplus = nn.Softplus()
         self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
         self.sum_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size, divisor_override = 1 )
@@ -36,18 +36,20 @@ class RegionAggregator(pl.LightningModule):
 
     def shared_step(self, batch):
         images = batch['image']
-        labels = batch['label']
+        true_labels = batch['label']
         
-        labels = self.sum_pool(labels)
-        mu, std = self(images)
+        labels = self.sum_pool(true_labels)
+        mu, std, gauss_perpixel = self(images)
+
+        ro = torch.mean(gauss_perpixel.cdf(true_labels + .15) - gauss_perpixel.cdf(true_labels - .15))
 
         mean_std = torch.mean(std)
         gauss = dist.Normal(mu, std)
         log_prob = -gauss.log_prob(labels)
         loss = torch.mean(log_prob)
-        
+       
         return {'loss': loss, 'mean_std': mean_std, 
-                'log_prob': torch.mean(log_prob)}
+                'log_prob': torch.mean(log_prob),'ro':ro}
 
 
     def training_step(self, batch, batch_idx):
@@ -56,6 +58,7 @@ class RegionAggregator(pl.LightningModule):
         self.log('train_loss', output['loss'])
         self.log('std', output['mean_std'])
         self.log('log_prob', output['log_prob'])
+        self.log('ro', output['ro'])
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
@@ -96,7 +99,7 @@ class AnalyticalRegionAggregator(RegionAggregator):
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
     
-        return means, torch.sqrt(var)
+        return means, torch.sqrt(var), gauss
 
     def pred_Out(self, x):
         means, std = super().forward(x)
@@ -109,40 +112,41 @@ class Uniform_model(pl.LightningModule):
         if type(hparams) == dict:
             hparams = Namespace(**hparams)
 
-        self.unet = UNet(3, 2)
+        self.unet = nn.Conv2d(3, 2, (1,1))
         self.softplus = nn.Softplus()
         self.avg_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size)
         self.sum_pool = nn.AvgPool2d((hparams.kernel_size, hparams.kernel_size), stride=hparams.kernel_size, divisor_override = 1 )
         self.flatten = nn.Flatten()
-        self.trainset = Eurosat(mode='train')
-        self.valset = Eurosat(mode='validation')
         self.save_hyperparameters(hparams)
 
     def forward(self, x):
         x = self.unet(x)
 
-        mean = x[:, 0]  
+        mu = x[:, 0]  
         std = x[:, 1] 
         std = self.softplus(std) + 1e-8
 
-        return mean, std
+        gauss = dist.Normal(mu, std)
+        return mu, std, gauss
 
     def shared_step(self, batch):
         images = batch['image']
-        labels = batch['label']
+        true_labels = batch['label']
 
-        labels = self.avg_pool(labels)
+        labels = self.avg_pool(true_labels)
         labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
         labels = labels.squeeze(1)
 
-        mu, std = self(images)
+        mu, std, gauss_perpixel = self(images)
+
+        ro = torch.mean(gauss_perpixel.cdf(true_labels + .15) - gauss_perpixel.cdf(true_labels - .15))
         gauss = dist.Normal(mu, std)
 
         mean_std = torch.mean(std)
 
         loss = -torch.mean(gauss.log_prob(labels))
     
-        return {'loss': loss, 'mean_std': mean_std}
+        return {'loss': loss, 'mean_std': mean_std,'ro':ro}
 
 
     def training_step(self, batch, batch_idx):
@@ -150,6 +154,7 @@ class Uniform_model(pl.LightningModule):
 
         self.log('train_loss', output['loss'])
         self.log('std', output['mean_std'])
+        self.log('ro', output['ro'])
         return output['loss']
 
     def validation_step(self, batch, batch_idx):
@@ -179,7 +184,7 @@ class Uniform_model(pl.LightningModule):
 
     
     def pred_Out(self, x):
-        means, std = self(x)
+        means, std, gauss = self(x)
         return means, std
 
 
@@ -211,6 +216,7 @@ def main(args):
     trainer = pl.Trainer.from_argparse_args(args,
                                             max_epochs=args.max_epochs,
                                             logger=logger,
+                                            accelerator="gpu", devices=args.gpus,
                                             callbacks=[checkpoint_callback, early_stopping],
                                             deterministic=True
                                             )
@@ -248,7 +254,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=80)
     parser.add_argument('--patience', type=int, default=100)
 
-    parser.add_argument('--method', type=str, default='analytical')
+    parser.add_argument('--method', type=str, default='uniform')
     parser.add_argument('--lambdaa', type=float, default=0.)
     args = parser.parse_args()
     main(args)

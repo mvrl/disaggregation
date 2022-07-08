@@ -50,8 +50,17 @@ def generate_pred_lists(model, dir_path, method):
     #print(df)
     #print(df['std'].mean())
 
+    plt.hist( np.array(ros50), bins=100)
+    plt.savefig('plot.jpg')
+    plt.show()
+
+    plt.hist( np.array(logs), bins=100)
+    plt.xlim([-4,2])
+    plt.savefig('plot2.jpg')
+    plt.show()
+
     mse_error = (np.array(mse_errors)).mean()
-    log_error = np.median(np.array(logs))
+    log_error = (np.array(logs)).mean()
     ro15_mean = (np.array(ros15)).mean()
     ro25_mean = (np.array(ros25)).mean()
     ro35_mean = (np.array(ros35)).mean()
@@ -70,7 +79,7 @@ def main(args):
 
     # use the desired check point path
     ckpt_path = os.path.join(dir_path,
-                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/16/10/lightning_logs/version_51/checkpoints/epoch=16-step=3230.ckpt')
+                             '/u/amo-d0/grad/cgar/Projects/disaggregation/synthetic_testing/80/logtest/analytical/8/10/lightning_logs/version_28/checkpoints/epoch=147-step=28120.ckpt')
     torch.cuda.set_device(1)
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
@@ -102,8 +111,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--max_epochs', type=int, default=150)
     parser.add_argument('--workers', type=int, default=8)
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--learning_rate', type=float, default=.0001)
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--learning_rate', type=float, default=.01)
     parser.add_argument('--save_dir', default='logs')
     parser.add_argument('--gpus', type=int, default=1)
     parser.add_argument('--kernel_size', type=int, default=16)

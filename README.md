@@ -1,5 +1,20 @@
 # disaggregation
 
+## Citation
+
+If you use this code, please cite the following paper:
+
+```bibtex
+@inproceedings{archbold2023fine,
+  author = {Archbold, Cohen and Brodie, Benjamin and Ogholbake, Aram Ansary and Jacobs, Nathan},
+  booktitle = {IEEE International Geoscience and Remote Sensing Symposium (IGARSS)},
+  title = {Fine-grained Property Value Assessment Using Probabilistic Disaggregation},
+  pdf = {https://arxiv.org/pdf/2306.00246.pdf},
+  month = jul,
+  year = {2023}
+}
+```
+
 ## Training
 Training controls in ```/aggregation/config.py```
 

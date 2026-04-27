@@ -1,3 +1,8 @@
+# Code for different variants of U-Net
+# Some parts taken from https://github.com/milesial/Pytorch-UNet
+# Implements light (half feature channels) and lighter (quarter number of feature maps) U-Net
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

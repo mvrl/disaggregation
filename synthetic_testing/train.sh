@@ -9,7 +9,7 @@ fi
 
 if [ "$1" = "analytical" ]
 then
-	python train_small.py --kernel_size "$2"
+	python train_new.py --kernel_size "$2"
 else
-	python train_small.py --method uniform --kernel_size "$2"
+	python train_new.py --method uniform --kernel_size "$2"
 fi

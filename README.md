@@ -1,5 +1,20 @@
 # disaggregation
 
+## Citation
+
+If you use this code, please cite the following paper:
+
+```bibtex
+@inproceedings{archbold2023fine,
+  author = {Archbold, Cohen and Brodie, Benjamin and Ogholbake, Aram Ansary and Jacobs, Nathan},
+  booktitle = {IEEE International Geoscience and Remote Sensing Symposium (IGARSS)},
+  title = {Fine-grained Property Value Assessment Using Probabilistic Disaggregation},
+  pdf = {https://arxiv.org/pdf/2306.00246.pdf},
+  month = jul,
+  year = {2023}
+}
+```
+
 ## Training
 Training controls in ```/aggregation/config.py```
 
@@ -55,3 +70,7 @@ Included here is Usman's code for training a segmentation network on Hennepin da
 We use this to generate pre-trained weights for the value estimation step.
 
 The model ckpts are stored in ```/outputs/```
+## Synthetic Testing
+
+`/synthetic_testing/`  
+A controlled synthetic experiment comparing analytical and uniform disaggregation methods using EuroSAT Sentinel-2 imagery with synthetically-generated labels. See [`synthetic_testing/README.md`](synthetic_testing/README.md) for full details.

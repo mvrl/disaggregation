@@ -251,7 +251,6 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                     del others[randomINDEX]
                     others = gpd.GeoSeries(others)
 
-
                     #print(others.distance(parcel_geom) )
                     distances = others.distance(parcel_geom)
                     min_value = np.min( distances )
@@ -262,13 +261,19 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
 
                     #print("RANDOM_INDEX: ", randomINDEX)
                     #print("closest_index: ", closestINDEX)
-                    del geoms[randomINDEX]
-                    masks[closestINDEX] = masks[closestINDEX] + masks[randomINDEX]
-                    parcel_values[closestINDEX] = parcel_values[closestINDEX] + parcel_values[randomINDEX]
                     
-                    del masks[randomINDEX]
-                    #masks = np.delete(masks,randomINDEX)
-                    parcel_values = np.delete(parcel_values,randomINDEX)
+                    mask_sum = masks[closestINDEX] + masks[randomINDEX]
+                    val_sum = parcel_values[closestINDEX] + parcel_values[randomINDEX]
+
+                    if(parcel_values[closestINDEX] / np.count_nonzero(masks[closestINDEX]) < 1000):
+                        
+                        parcel_values[closestINDEX] = val_sum
+                        masks[closestINDEX] = mask_sum
+
+                        del geoms[randomINDEX]
+                        del masks[randomINDEX]
+                        #masks = np.delete(masks,randomINDEX)
+                        parcel_values = np.delete(parcel_values,randomINDEX)
                     
                     
             #Masks will be reduced by n/2
@@ -314,15 +319,18 @@ class dataset_hennepin(Dataset):        # derived from 'dataset_SkyFinder_multi_
                     #print(closestGEOM)
                     closestINDEX = geoms.index(closestGEOM)
 
-                    #print("RANDOM_INDEX: ", randomINDEX)
-                    #print("closest_index: ", closestINDEX)
-                    del geoms[randomINDEX]
-                    masks[closestINDEX] = masks[closestINDEX] + masks[randomINDEX]
-                    parcel_values[closestINDEX] = parcel_values[closestINDEX] + parcel_values[randomINDEX]
-                    
-                    del masks[randomINDEX]
-                    #masks = np.delete(masks,randomINDEX)
-                    parcel_values = np.delete(parcel_values,randomINDEX)
+                    mask_sum = masks[closestINDEX] + masks[randomINDEX]
+                    val_sum = parcel_values[closestINDEX] + parcel_values[randomINDEX]
+
+                    if(parcel_values[closestINDEX] / np.count_nonzero(masks[closestINDEX]) < 1000):
+                        
+                        parcel_values[closestINDEX] = val_sum
+                        masks[closestINDEX] = mask_sum
+
+                        del geoms[randomINDEX]
+                        del masks[randomINDEX]
+                        #masks = np.delete(masks,randomINDEX)
+                        parcel_values = np.delete(parcel_values,randomINDEX)
                     
                     
             #Masks will be reduced by n/2

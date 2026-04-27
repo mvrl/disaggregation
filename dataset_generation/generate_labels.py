@@ -7,7 +7,6 @@ from osgeo import ogr
 import geopandas as gpd
 import argparse
 import shapely
-from geofeather import to_geofeather, from_geofeather
 import random
 #import pygeos 
 import pandas as pd
@@ -17,7 +16,7 @@ import pandas as pd
 
 parser = argparse.ArgumentParser(description='Download Image Set to folder')
 parser.add_argument('--dir', type=str, help='Directory to download to.', default= './downloads/')
-parser.add_argument('--gsd', type=int, help='Ground Sample Distance', default=1)
+parser.add_argument('--gsd', type=float, help='Ground Sample Distance', default=1.0)
 args = parser.parse_args()
 
 # Local paths
@@ -37,7 +36,7 @@ def raster_parcel_mask(bbox, row_bbox, fn, gdf):
 
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
-    pixel_size = int(args.gsd)
+    pixel_size = args.gsd
 
     #get extent values to set size of output raster.
     x_min, x_max, y_min, y_max = bbox
@@ -85,7 +84,7 @@ def raster_buildings(bbox, row_bbox, fn, gdf):
 
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
-    pixel_size = int(args.gsd)
+    pixel_size = args.gsd
 
     #get extent values to set size of output raster.
     x_min, x_max, y_min, y_max = bbox
@@ -135,7 +134,7 @@ def raster_boundary(bbox, row_bbox, fn, gdf):
 
     #pixel_size determines the size of the new raster.
     #pixel_size is proportional to size of shapefile.
-    pixel_size = int(args.gsd)
+    pixel_size = args.gsd
 
     #get extent values to set size of output raster.
     x_min, x_max, y_min, y_max = bbox
@@ -193,7 +192,7 @@ def raster_masks(polygon, bbox, gdf, dir, combine_nearest = False):
 
             #pixel_size determines the size of the new raster.
             #pixel_size is proportional to size of shapefile.
-            pixel_size = int(args.gsd)
+            pixel_size = args.gsd
 
             #get extent values to set size of output raster.
             x_min, x_max, y_min, y_max = bbox
@@ -243,15 +242,20 @@ if __name__ == "__main__":
     feather_path = args.dir    
     bbox_df = pd.read_csv(csv_path)
 
-    print("using Geofeather")
-    feather_file = os.path.join(feather_path, os.path.basename(shp_path).replace('.shp', '.feather'))
-    if os.path.exists(feather_file):
-        gdf = from_geofeather(feather_file)
-    else:
-        gdf = gpd.read_file(shp_path)
-        to_geofeather(gdf, feather_file)
-    #shp_path = shp_path
+    print("Reading shp")
+    
+    gdf = gpd.read_file(shp_path)
 
+    gdf['AVERAGE_MV1'] = gdf['TOTAL_MV1'] / gdf['geometry'].area
+
+    '''
+        Label Normalization
+    '''
+    # Watch for outliers
+    gdf = gdf[gdf['TOTAL_MV1'].between(gdf['TOTAL_MV1'].quantile(0.1), gdf['TOTAL_MV1'].quantile(0.9))]
+    gdf = gdf[gdf['AVERAGE_MV1'].between(gdf['AVERAGE_MV1'].quantile(0.1), gdf['AVERAGE_MV1'].quantile(0.9))]
+        
+    
     print( "done")
 
     gdf.set_crs("EPSG:26915")

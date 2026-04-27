@@ -67,7 +67,10 @@ def main(args):
     test_file_path = os.path.join(dir_path, 'logg.txt')
 
     ckpt_path = args.ckpt_path
-    device = args.device if torch.cuda.is_available() else 'cpu'
+    if torch.cuda.is_available():
+        device = args.device
+    else:
+        device = 'cpu'
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
         model = model.load_from_checkpoint(ckpt_path).to(device).eval()

@@ -63,6 +63,6 @@ class Eurosat(torch.utils.data.Dataset):
         
         channel_mean = image.mean(dim=(1, 2), keepdim=True)
         channel_std = image.std(dim=(1, 2), keepdim=True)
-        image = (image - channel_mean) / channel_std
+        image = (image - channel_mean) / (channel_std + 1e-8)
         return {'image': image, 'label': label}
 

@@ -14,8 +14,14 @@ import torch
 class Eurosat(torch.utils.data.Dataset):
    
     
-    def __init__(self, mode='train', root='/u/amo-d0/grad/aan244/disagg/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
-        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
+    def __init__(self, mode='train', root=None):
+        root = root or os.environ.get('EUROSAT_ROOT')
+        if not root:
+            raise ValueError(
+                "Dataset root must be provided via the `root` argument or the `EUROSAT_ROOT` environment variable."
+            )
+        root = os.path.abspath(root)
+        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions=('.tif',))
 
         if mode == 'train':
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
@@ -55,11 +61,8 @@ class Eurosat(torch.utils.data.Dataset):
         label = (label - torch.mean(label)) / torch.std(label)
        # label = (label - torch.min(label)) / (torch.max(label)-torch.min(label))
         
-        norm_image =[]
-        for i in range(image.shape[0]):
-            norm_image.append(np.array((image[i,:,:]-image[i,:,:].mean())/(image[i,:,:].std())).tolist())
-       #     norm_image.append(np.array((image[i,:,:]-image[i,:,:].min())/(image[i,:,:].max()-image[i,:,:].min())).tolist())
-
-        image = torch.tensor(norm_image)
+        channel_mean = image.mean(dim=(1, 2), keepdim=True)
+        channel_std = image.std(dim=(1, 2), keepdim=True)
+        image = (image - channel_mean) / channel_std
         return {'image': image, 'label': label}
 

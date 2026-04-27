@@ -1,9 +1,15 @@
 #!/bin/bash
 
 #first argument is the method and the second argument is the kernel size
-if [ $1 == 'analytical' ]
+if [ "$#" -lt 2 ]
 then
-	python train_small.py --kernel_size $2
+	echo "Usage: $0 <method> <kernel_size>" >&2
+	exit 1
+fi
+
+if [ "$1" = "analytical" ]
+then
+	python train_small.py --kernel_size "$2"
 else
-	python train_small.py --method uniform --kernel_size $2
+	python train_small.py --method uniform --kernel_size "$2"
 fi

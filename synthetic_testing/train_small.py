@@ -8,7 +8,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from unet import UNet
 from argparse import ArgumentParser, Namespace
 from pytorch_lightning import seed_everything
-import test_new 
 
 
 
@@ -19,7 +18,7 @@ def gaussLoss(mean, std, target):
     return loss
 
 
-class model(pl.LightningModule):
+class Model(pl.LightningModule):
 
     def __init__(self, hparams):
         super().__init__()
@@ -77,12 +76,10 @@ class model(pl.LightningModule):
         return {'optimizer': optimizer}
 
 
-class AnalyticalRegionAggregator(model):
+class AnalyticalRegionAggregator(Model):
 
     def forward(self, x):
         mu, std = super().forward(x)
-        
-        gauss_dist = dist.Normal(mu, std)
 
         means = self.sum_pool(mu)
         var = self.sum_pool(std**2)
@@ -111,14 +108,18 @@ class AnalyticalRegionAggregator(model):
         return means, std
 
 
-class Uniform_model(model):
+class Uniform_model(Model):
 
     def shared_step(self, batch):
         images = batch['image']
         labels = batch['label']
 
         labels = self.avg_pool(labels)
-        labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
+        labels = torch.nn.functional.interpolate(
+            labels.unsqueeze(1),
+            scale_factor=self.hparams.kernel_size,
+            mode='nearest'
+        )
         labels = labels.squeeze(1)
         
         mu, std = self(images)

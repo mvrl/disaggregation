@@ -1,8 +1,3 @@
-# Code for different variants of U-Net
-# Some parts taken from https://github.com/milesial/Pytorch-UNet
-# Implements light (half feature channels) and lighter (quarter number of feature maps) U-Net
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,12 +80,9 @@ class down(nn.Module):
 class up(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(up, self).__init__()
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-
         self.conv = double_conv(in_ch, out_ch)
 
     def forward(self, x1, x2):
-        #x1 = self.up(x1)
         x1 = nn.functional.interpolate(x1, scale_factor=2, mode='nearest')
 
         # input is CHW

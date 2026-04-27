@@ -12,16 +12,22 @@ from sklearn.model_selection import train_test_split
 import torch
 
 class Eurosat(torch.utils.data.Dataset):
-    def __init__(self, mode='train', root='/localdisk0/SCRATCH/watch/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
-        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
+   
+    
+    def __init__(self, mode='train', root=None):
+        root = root or os.environ.get('EUROSAT_ROOT')
+        if not root:
+            raise ValueError(
+                "Dataset root must be provided via the `root` argument or the `EUROSAT_ROOT` environment variable."
+            )
+        root = os.path.abspath(root)
+        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions=('.tif',))
 
         if mode == 'train':
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)
             self.dset = train_set
             self.transform = A.Compose([
               A.HorizontalFlip(p=0.5),
-              A.RandomRotate90(p=1.0),
-              A.NoOp()
             ],
             )
         elif mode == 'test' or mode == 'validation':
@@ -32,31 +38,31 @@ class Eurosat(torch.utils.data.Dataset):
             ],
             )
 
-        self.rgb_mean = torch.tensor([ 946.2784, 1041.8102, 1117.2845]).unsqueeze(1).unsqueeze(1)
-        self.rgb_std = torch.tensor([594.3585, 395.1237, 333.4564]).unsqueeze(1).unsqueeze(1)
-        self.ir_mean = torch.tensor(2299.8538)
-        self.ir_std = torch.tensor(1117.7264)
-            
     def im_loader(self, path):
+   
         image = np.asarray((io.imread(path)), dtype='float32')
+       # image = (image - image.min()) / (image.max()-image.min())
         return image
 
     def __len__(self):
         return len(self.dset)
 
     def __getitem__(self, idx):
-        item = self.dset[idx]
+        item = self.dset.__getitem__(idx)
 
         transformed = self.transform(image=item[0])
         image = transformed['image']
         image = torch.tensor(image).permute(2, 0, 1)
-        
-        label = torch.tensor(item[0]).permute(2,0,1)
+
+        #label = torch.tensor(item[0]).permute(2,0,1)
         label = image[7,:,:]
         image = image[[3,2,1],:,:]
-
-        image = (image - self.rgb_mean) / self.rgb_std
-        label = (label - self.ir_mean) / self.ir_std
         
+        label = (label - torch.mean(label)) / torch.std(label)
+       # label = (label - torch.min(label)) / (torch.max(label)-torch.min(label))
+        
+        channel_mean = image.mean(dim=(1, 2), keepdim=True)
+        channel_std = image.std(dim=(1, 2), keepdim=True)
+        image = (image - channel_mean) / (channel_std + 1e-8)
         return {'image': image, 'label': label}
 

@@ -2,20 +2,17 @@ import torch
 from dataset import Eurosat
 from tqdm import tqdm
 import os
-import train_new as train
+import train_small as train
 import torch.distributions as dist
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
+from scipy.stats import norm
+import statistics
+from argparse import ArgumentParser, Namespace
 
 testset = Eurosat(mode='test')
 
-def gaussLoss_test(mean, std, target):
-    gauss = dist.Normal(mean, std)
-    loss = gauss.log_prob(target)
-    loss = -(torch.mean(loss, 1))
-    loss = torch.mean(loss)
-    return loss
 
 def generate_pred_lists(model, dir_path, method):
     test_loader = torch.utils.data.DataLoader(testset,
@@ -24,72 +21,43 @@ def generate_pred_lists(model, dir_path, method):
                                               pin_memory=False
                                               )
 
-    estimated_arr = []
-    std_arr = []
-    value_arr = []
-    logs = []
-    ros15 = []
-    ros25 = []
-    ros35 = []
-    ros50 = []
-    ros1 = []
-    i= 0
+    means,stds,targets,logs, ros15,ros25,ros35,ros50,ros1 = ([] for i in range(9))
+    
     with torch.no_grad():
         for sample in tqdm(test_loader):
-            images = sample['image']
 
+            images = sample['image']
             labels = sample['label']
             labels = torch.flatten(labels, 1, 2)
 
-            estimated_values, std_values = model.pred_Out(images)
-        # estimated_values  = model.pred_Out(images)
+            means_values, stds_values = model.pred_Out(images)
 
-            estimated_arr.extend(estimated_values[0].cpu().numpy().tolist())
-            std_arr.extend(std_values[0].cpu().numpy().tolist())
-            value_arr.extend(labels[0].cpu().numpy().tolist())
+            means.extend(means_values[0].cpu().numpy().tolist())
+            stds.extend(stds_values[0].cpu().numpy().tolist())
+            targets.extend(labels[0].cpu().numpy().tolist())
 
-            log = gaussLoss_test(estimated_values, std_values, labels).cpu().numpy().tolist()
-            # print(log)
+            log = train.gaussLoss(means_values, stds_values, labels).cpu().numpy().tolist()
+           # print(log)
             logs.append(log)
 
-            gauss = dist.Normal(estimated_values, std_values)
+            gauss = dist.Normal(means_values, stds_values)
 
-            ro15 = ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15))[0].cpu().numpy().tolist())
-            ro25 = ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25))[0].cpu().numpy().tolist())
-            ro35 = ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35))[0].cpu().numpy().tolist())
-            ro50 = ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - 0.5))[0].cpu().numpy().tolist())
-            ro1 = ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.))[0].cpu().numpy().tolist())
-            ros15.extend(ro15)
-            ros25.extend(ro25)
-            ros35.extend(ro35)
-            ros50.extend(ro50)
-            ros1.extend(ro1)
-
-           # print (labels.shape, labels.squeeze().shape)
-           # print (estimated_values.shape, estimated_values.squeeze().shape)
-           # print (images.shape, estimated_values.squeeze().shape)
-            i += 1
-
-
-    mse_errors = np.square(np.array(value_arr) - np.array(estimated_arr))
+            ros15.extend ((gauss.cdf(labels + 0.15) - gauss.cdf(labels - 0.15))[0].cpu().numpy().tolist())
+            ros25.extend ((gauss.cdf(labels + 0.25) - gauss.cdf(labels - 0.25))[0].cpu().numpy().tolist())
+            ros35.extend ((gauss.cdf(labels + 0.35) - gauss.cdf(labels - 0.35))[0].cpu().numpy().tolist())
+            ros50.extend ((gauss.cdf(labels + 0.5) - gauss.cdf(labels - .5))[0].cpu().numpy().tolist())
+            ros1.extend ((gauss.cdf(labels + 1.) - gauss.cdf(labels - 1.))[0].cpu().numpy().tolist())
+            
+    mse_errors = np.square(np.array(targets) - np.array(means))
     log_error = (np.array(logs)).mean()
     ro15_mean = (np.array(ros15)).mean()
     ro25_mean = (np.array(ros25)).mean()
     ro35_mean = (np.array(ros35)).mean()
     ro50_mean = (np.array(ros50)).mean()
     ro1_mean = (np.array(ros1)).mean()
-    print(np.array(std_arr).mean(), "std")
     
-    value_arr = np.array(value_arr)
-    #gaussian_MSE = ( value_arr - np.array(model.gauss_fit()[0]))**2
-    #print (gaussian_MSE.mean(), "gauss_mse")
-    #Gauss = model.gauss_fit()[2]
-    #log_gaussian = (Gauss.log_prob (torch.tensor(value_arr))).mean()
-    #print (log_gaussian,"gauss_log")
-    #print (model.gauss_fit()[1], "gauss_std")
-    #print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(0.5)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(0.5))))
-    #print (torch.mean(Gauss.cdf(torch.tensor(value_arr) + torch.tensor(0.15)) - Gauss.cdf(torch.tensor(value_arr) - torch.tensor(0.15))))
-    return np.mean(mse_errors), log_error, ro15_mean,ro25_mean,ro35_mean,ro50_mean,ro1_mean,np.array(std_arr).mean()
+    value_arr = np.array(targets)
+    return mse_errors.mean(), log_error, ro15_mean,ro25_mean,ro35_mean,ro50_mean,ro1_mean,np.array(stds).mean()
 
 
 def main(args):
@@ -98,22 +66,17 @@ def main(args):
     dir_path = os.getcwd()
     test_file_path = os.path.join(dir_path, 'logg.txt')
 
-    # use the desired check point path
-    ckpt_path = os.path.join(dir_path,
-                             'average/logtest/analytical/16/10/default/version_5/checkpoints/epoch=114-step=21849.ckpt')
-    torch.cuda.set_device(1)
+    ckpt_path = args.ckpt_path
+    if torch.cuda.is_available():
+        device = args.device
+    else:
+        device = 'cpu'
     if args.method == 'analytical':
         model = train.AnalyticalRegionAggregator(args)
-        model = model.load_from_checkpoint(ckpt_path,
-                                           use_pretrained=False).eval()
-    elif args.method == 'rsample':
-        model = train.SamplingRegionAggregator.load_from_checkpoint(ckpt_path,
-                                           k=500).eval()
-
+        model = model.load_from_checkpoint(ckpt_path).to(device).eval()
     elif args.method == 'uniform':
-        model = train.Uniform_model( args)
-        model = model.load_from_checkpoint(ckpt_path,
-                                           use_pretrained=False).eval()
+        model = train.Uniform_model(args)
+        model = model.load_from_checkpoint(ckpt_path).to(device).eval()
 
     mse_error, log_error, ro15,ro25,ro35,ro50,ro1,std = generate_pred_lists(model, dir_path, args.method)
 
@@ -126,8 +89,6 @@ def main(args):
 
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser, Namespace
-
     parser = ArgumentParser()
 
     parser.add_argument('--max_epochs', type=int, default=150)
@@ -138,8 +99,11 @@ if __name__ == '__main__':
     parser.add_argument('--gpus', type=int, default=1)
     parser.add_argument('--kernel_size', type=int, default=16)
     parser.add_argument('--patience', type=int, default=100)
-
     parser.add_argument('--method', type=str, default='analytical')
+    parser.add_argument('--ckpt_path', type=str, required=True,
+                        help='Path to model checkpoint file')
+    parser.add_argument('--device', type=str, default='cuda',
+                        help='Device to run evaluation on (e.g. cuda, cpu)')
 
     args = parser.parse_args()
     main(args)

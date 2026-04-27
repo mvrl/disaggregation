@@ -70,3 +70,7 @@ Included here is Usman's code for training a segmentation network on Hennepin da
 We use this to generate pre-trained weights for the value estimation step.
 
 The model ckpts are stored in ```/outputs/```
+## Synthetic Testing
+
+`/synthetic_testing/`  
+A controlled synthetic experiment comparing analytical and uniform disaggregation methods using EuroSAT Sentinel-2 imagery with synthetically-generated labels. See [`synthetic_testing/README.md`](synthetic_testing/README.md) for full details.

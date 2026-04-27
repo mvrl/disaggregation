@@ -15,8 +15,14 @@ import torch.distributions as dist
 
 class Eurosat(torch.utils.data.Dataset):
    
-    def __init__(self, mode='train', root='/u/eag-d1/data/Hennepin/EuroSAT/ds/images/remote_sensing/otherDatasets/sentinel_2/tif'):
-        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions='tif')
+    def __init__(self, mode='train', root=None):
+        root = root or os.environ.get('EUROSAT_ROOT')
+        if not root:
+            raise ValueError(
+                "Dataset root must be provided via the `root` argument or the `EUROSAT_ROOT` environment variable."
+            )
+        root = os.path.abspath(root)
+        data = torchvision.datasets.DatasetFolder(root=root, loader=self.im_loader, transform=None, extensions=('.tif',))
 
         if mode == 'train':
             train_set, _ = train_test_split(data, test_size=0.1, stratify=data.targets, random_state=42)

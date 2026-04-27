@@ -134,7 +134,11 @@ class Uniform_model(pl.LightningModule):
         true_labels = batch['label']
 
         labels = self.avg_pool(true_labels)
-        labels = torch.nn.functional.upsample_nearest(labels.unsqueeze(1),scale_factor=self.hparams.kernel_size)
+        labels = torch.nn.functional.interpolate(
+            labels.unsqueeze(1),
+            scale_factor=self.hparams.kernel_size,
+            mode='nearest'
+        )
         labels = labels.squeeze(1)
 
         mu, std, gauss_perpixel = self(images)

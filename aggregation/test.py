@@ -103,24 +103,22 @@ def generate_pred_lists(model, dir_path):
 
     return mae_errors.mean(), mse_errors.mean(), np.mean(logs), np.median(logs), relative_error.mean()*100, np.mean(metrics10k), np.mean(metrics100k), np.mean(stds), np.mean(np.exp(logs))
 
-def loadModel(ckpt_path, model_name = cfg.train.model):
-    model =train.chooseModel(model_name)
-    if(model_name == 'logsample'):
-         model = model.load_from_checkpoint(ckpt_path, 
-        use_pretrained=False, num_samples= cfg.train.num_samples)
-    else:
-        model = model.load_from_checkpoint(ckpt_path, 
-        use_pretrained=False)
-    return model
+def loadModel(ckpt_path, model_name=cfg.train.model):
+    # Use the class (not an instance) for load_from_checkpoint — required by PL 2.x.
+    cls = type(train.chooseModel(model_name))
+    if model_name == 'logsample':
+        return cls.load_from_checkpoint(ckpt_path, use_pretrained=False, num_samples=cfg.train.num_samples)
+    return cls.load_from_checkpoint(ckpt_path, use_pretrained=False)
 
 if __name__ == '__main__':
     dir_path = os.path.join(os.getcwd(), 'results', cfg.experiment_name)
     ckpt_path = os.path.join(dir_path,'best.ckpt')
     test_file_path = os.path.join( dir_path, 'stats.txt')
 
-    torch.cuda.set_device(1)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(0)
 
-    model = loadModel(ckpt_path , cfg.train.model)
+    model = loadModel(ckpt_path, cfg.train.model)
 
     mae_error, mse_error, log_error, med_log_error, percent_error, metric10k_mean, metric100k_mean, variances_mean, pdf_mean = generate_pred_lists(model, dir_path)
 

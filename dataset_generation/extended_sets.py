@@ -75,11 +75,21 @@ class HennepinStyleTransfer(Dataset):
         return sample
 
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+    import paths  # noqa: F401
 
-    dataset = HennepinStyleTransfer(['/u/eag-d1/data/Hennepin/2020','/u/eag-d1/data/Hennepin/2018'],'train', crop_size = (100,100),
-                            transform = transforms.Compose([
-                                                transforms.ToTensor(),
-                                                transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),       
-                            ]))
+    root_2020 = os.environ.get('HENNEPIN_2020_ROOT', '')
+    root_2018 = os.environ.get('HENNEPIN_2018_ROOT', '')
+    if not (root_2020 and root_2018):
+        raise SystemExit("Set HENNEPIN_2020_ROOT and HENNEPIN_2018_ROOT (in paths.env or your shell).")
+
+    dataset = HennepinStyleTransfer(
+        [root_2020, root_2018], 'train', crop_size=(100, 100),
+        transform=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ]),
+    )
 
     print(dataset[0])

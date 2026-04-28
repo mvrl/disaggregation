@@ -16,15 +16,14 @@ def get_network(net_name, in_channels=3):
         net = UNet(in_channels=3, out_channels=cfg.model.out_channels)
     elif net_name == 'nested_unet':
         from models.unet import NestedUNet
-        net = NestedUNet(in_ch=3, out_ch=cfg.model.out_channels)  
+        net = NestedUNet(in_ch=3, out_ch=cfg.model.out_channels)
     else:
-        raise valueError('no model with name:',net_name)
-    
-    # set to CUDA and GPUs
-    net.cuda()
-    if len(cfg.train.device_ids)>1:
+        raise ValueError('no model with name:', net_name)
+
+    net = net.to(cfg.train.device)
+    if cfg.train.device == 'cuda' and len(cfg.train.device_ids) > 1:
         net = nn.DataParallel(net, device_ids=cfg.train.device_ids)
-    
+
     print('model parameters:', count_trainable_parameters(net))
-    
+
     return net

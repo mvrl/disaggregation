@@ -45,7 +45,12 @@ if __name__ == '__main__':
     early_stopping = EarlyStopping('val_loss', patience=cfg.train.patience)
 
     
-    trainer = pl.Trainer(gpus=cfg.train.device_ids, max_epochs = cfg.train.num_epochs, callbacks=[check_callback,early_stopping])
+    trainer = pl.Trainer(
+        accelerator=cfg.train.accelerator,
+        devices=cfg.train.devices,
+        max_epochs=cfg.train.num_epochs,
+        callbacks=[check_callback, early_stopping],
+    )
     t0 = time.time()
     trainer.fit(model, train_loader, val_loader)
     t1 = time.time()

@@ -11,8 +11,11 @@ from config import cfg
 from net_factory import get_network
 from data_factory import get_data
 
-torch.backends.cudnn.benchmark = True
-torch.cuda.set_device(cfg.train.device_ids[0])
+if cfg.train.device == 'cuda':
+    torch.backends.cudnn.benchmark = True
+    torch.cuda.set_device(cfg.train.device_ids[0])
+
+device = torch.device(cfg.train.device)
 
 model = get_network(cfg.model.name)
 
@@ -31,7 +34,7 @@ weight_list = cfg.train.loss_weight
 if len(weight_list)==0:
     seg_criterion = nn.CrossEntropyLoss(ignore_index=-1) 
 else:
-    weight = torch.tensor(weight_list).cuda()
+    weight = torch.tensor(weight_list).to(device)
     print('class weights for loss:', weight)
     seg_criterion = nn.CrossEntropyLoss(weight, ignore_index=-1)
 
@@ -58,10 +61,10 @@ for epoch in range(cfg.train.num_epochs):
     loss_train = 0
     model.train()
     for i, data in enumerate(train_loader):
-        optim.zero_grad()  # clear gradients        
-        image = data[0].cuda()
-        seg_labels = data[1].long().cuda()
-        #reg_labels = data[2].float().cuda()
+        optim.zero_grad()  # clear gradients
+        image = data[0].to(device)
+        seg_labels = data[1].long().to(device)
+        #reg_labels = data[2].float().to(device)
 
         #print( seg_labels )
         
@@ -104,9 +107,9 @@ for epoch in range(cfg.train.num_epochs):
     with torch.no_grad():
         for i, data in enumerate(val_loader):
             optim.zero_grad()  # clear gradients
-            image = data[0].cuda()
-            seg_labels = data[1].long().cuda()
-            reg_labels = data[2].float().cuda()
+            image = data[0].to(device)
+            seg_labels = data[1].long().to(device)
+            reg_labels = data[2].float().to(device)
         
             seg_predictions = model(image)
             seg_loss = seg_criterion(seg_predictions, seg_labels).unsqueeze(0)
@@ -129,15 +132,15 @@ for epoch in range(cfg.train.num_epochs):
     # save best model checkpoint
     if loss_val < best_val_loss:
         best_val_loss = loss_val
-        fname = 'model_dict.pth'
-        torch.save(model.state_dict(), os.path.join(out_dir, fname))
+        torch.save(model.state_dict(), os.path.join(out_dir, 'model_dict.pth'))
+        # canonical filename consumed by aggregation/modules.py via PRETRAINED_CKPT
+        torch.save(model.state_dict(), os.path.join(out_dir, 'building_seg_pretrained.pth'))
         print('=========== model saved at epoch: ', epoch+1, ' =================')
 
-        
+
 # save model checkpoint at the end
-fname = 'model_dict_end.pth'
-torch.save(model.state_dict(), os.path.join(out_dir, fname))
-print('model saved at the end of training: ')        
+torch.save(model.state_dict(), os.path.join(out_dir, 'model_dict_end.pth'))
+print('model saved at the end of training: ')
 
 # save loss curves        
 plt.figure()

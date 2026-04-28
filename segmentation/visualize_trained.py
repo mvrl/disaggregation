@@ -139,9 +139,9 @@ def main():
                 break
                 
             # reading data
-            image = data[0].cuda()
-            seg_labels = data[1].long().cuda()
-            reg_labels = data[2].float().cuda()
+            image = data[0].to(cfg.train.device)
+            seg_labels = data[1].long().to(cfg.train.device)
+            reg_labels = data[2].float().to(cfg.train.device)
 
             seg_predictions = model(image)
             if i==0:

@@ -79,8 +79,8 @@ def main():
     with torch.no_grad():
         for i, data in enumerate(data_loader, 0):
             # reading data
-            image = data[0].cuda()
-            labels = data[1].cuda().long()
+            image = data[0].to(cfg.train.device)
+            labels = data[1].to(cfg.train.device).long()
 
             predictions = model(image)
 

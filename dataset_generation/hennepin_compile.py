@@ -140,22 +140,31 @@ def build_dataset(df, data_dir, gdf, dest_folder, combine):
 
 
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+    import paths  # noqa: F401  side effect: load paths.env
+
     random.seed(0)
 
-    data_dir = '/u/eag-d1/data/Hennepin/new_area_302_fixed/'
+    # Source: directory of per-tile subdirs (the `ver8/`-style layout that
+    # segmentation/data_factory.py reads).
+    data_dir = os.environ.get('HENNEPIN_RAW_ROOT', '')
+    shp_path = os.environ.get('HENNEPIN_PARCEL_SHP', '')
+    dest_path = os.environ.get('HENNEPIN_COMPILED_OUT', '')
+    combine = os.environ.get('HENNEPIN_COMBINE', '1') != '0'
+
+    if not (data_dir and shp_path and dest_path):
+        raise SystemExit(
+            "Set HENNEPIN_RAW_ROOT, HENNEPIN_PARCEL_SHP, and HENNEPIN_COMPILED_OUT "
+            "(in paths.env or your shell). HENNEPIN_COMBINE=0 to disable parcel combining."
+        )
 
     csv_path = os.path.join(data_dir, 'hennepin_bbox.csv')
-    #shp_path = os.path.join(data_dir, 'hennepin.shp')
-    shp_path = "/u/eag-d1/data/Hennepin/hennepin_county_parcels/hennepin_county_parcels.shp"
-    ds_path = os.path.join(data_dir, 'dataset_compiled')
 
     df = pd.read_csv(csv_path)
     print("dataset_hennepin: Reading GeoDataFrame...")
     gdf = gpd.read_file(shp_path)
     print("dataset_hennepin: Done...")
-    # Watch for outliers
-    #gdf = gdf[gdf['TOTAL_MV1'].between(gdf['TOTAL_MV1'].quantile(0.05), gdf['TOTAL_MV1'].quantile(0.95))]
     print("dataset_hennepin: Reading Images, pickling...")
 
-    path = '/u/eag-d1/data/Hennepin/compiled_302x302_gsd1_COMBINED_fixed/'
-    build_dataset(df,data_dir,gdf,path, True)   
+    build_dataset(df, data_dir, gdf, dest_path, combine)

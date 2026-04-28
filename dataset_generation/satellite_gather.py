@@ -74,8 +74,6 @@ if __name__ == "__main__":
       columns=('lat_min', 'lon_min', 'lat_mid', 'lon_mid', 'lat_max',
                'lon_max'))
 
-  #naip_dir = '/u/eag-d1/scratch/ebird/naip/'
-
   #print(df.head())
 
   if __name__ == '__main__':

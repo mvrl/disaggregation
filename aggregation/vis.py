@@ -65,7 +65,7 @@ def generate_images(model, num_images, dir_path):
             print(region_map.shape)
 
             for i,mask in enumerate(masks):
-                mask = np.array(mask)
+                mask = np.array(mask, dtype=np.int32)
                 region_map = np.add(mask*np.random.randint(0,1000), region_map)
 
             region_map = region_map.reshape(cfg.data.cutout_size).astype('float64')
@@ -145,13 +145,14 @@ def generate_scatter(model, dir_path):
     plt.savefig(os.path.join(dir_path,"true_value_hist.png"))
     plt.close()
 
-    ax = sns.kdeplot(x = value_arr, y = estimated_arr,
-     fill= True, thresh=0, levels=15,cmap="Blues", clip = (100000,500000))
-    ax.set(xlabel = "True Values", ylabel = "Estimated Value", title= "")
-    #ax.set_xlim(0,500000)
-    #ax.set_ylim(0,500000)
-    plt.ticklabel_format(axis='both', style='sci')
-    plt.savefig(density_pth, bbox_inches='tight', pad_inches=0.1)
+    try:
+        ax = sns.kdeplot(x=value_arr, y=estimated_arr,
+                         fill=True, thresh=0, levels=15, cmap="Blues", clip=(100000, 500000))
+        ax.set(xlabel="True Values", ylabel="Estimated Value", title="")
+        plt.ticklabel_format(axis='both', style='sci')
+        plt.savefig(density_pth, bbox_inches='tight', pad_inches=0.1)
+    except (ValueError, np.linalg.LinAlgError) as e:
+        print(f"warning: KDE plot skipped ({e}) — too few/degenerate samples.")
     plt.close()
 
     mae_errors = np.abs( np.array(value_arr) - np.array(estimated_arr))

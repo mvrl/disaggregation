@@ -1,25 +1,42 @@
-from statistics import variance
-import pytorch_lightning as pl
-import torch 
-import util
-from models import unet
-import torch.nn as nn
-import torch.distributions as dist
-from config import cfg
+import os
 
-# Linear Basline
+import pytorch_lightning as pl
+import torch
+import torch.distributions as dist
+import torch.nn as nn
+
+from config import cfg
+from models import unet
+
+
+def _load_pretrained(unet_module, ckpt_path=None):
+    """Load building-segmentation pretrained weights into a UNet, ignoring shape-mismatched keys."""
+    ckpt_path = ckpt_path or cfg.train.pretrained_ckpt
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(
+            f"Pretrained checkpoint not found at {ckpt_path}. "
+            f"Either train segmentation/ to produce it (it writes building_seg_pretrained.pth), "
+            f"or set the PRETRAINED_CKPT environment variable, "
+            f"or set cfg.train.use_pretrained = False."
+        )
+    pretrained_state = torch.load(ckpt_path, map_location='cpu')
+    model_state = unet_module.state_dict()
+    pretrained_state = {
+        k: v for k, v in pretrained_state.items()
+        if k in model_state and v.size() == model_state[k].size()
+    }
+    model_state.update(pretrained_state)
+    unet_module.load_state_dict(model_state)
+
+
+# Linear baseline
 class RALModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=1)
 
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
+        if use_pretrained:
+            _load_pretrained(self.unet)
 
         self.loss_torch = torch.nn.MSELoss()
 
@@ -87,91 +104,13 @@ class RALModule(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
-class UniformModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
-        super().__init__()
-        self.unet = unet.UNet(in_channels=3, out_channels=1)
-
-        # This wont work, since the pretrained unet has 2 output channels
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
-
-    def forward(self, x):
-        x = self.unet(x)
-        return x # B x 1 x H x W
-
-    def cnnOutput(self, x):
-        x = self.unet(x)
-        return x
-
-    def value_predictions(self, batch):
-        image, masks, values = batch['image'], batch['masks'], batch['values']
-
-        vals = self(image)
-        # Shape: B X 1 X H X W
-
-        vals = torch.flatten(vals, start_dim=1)
-        # Shape: B X 1 X HW
-
-        masks = torch.flatten(masks,start_dim = 2)
-        masks = torch.swapdims(masks,2,1)
-        # Shape: B X HW X 100 'max 100 parcels in a sample"
-        
-        #Aggregate
-        vals_sums = torch.matmul(vals.unsqueeze(1).float(), masks.float()).squeeze(1)
-        #Shape: B X 100
-
-        #We need to ignore the zeroes
-        indices = vals_sums.nonzero(as_tuple=True)
-        vals_sums = vals_sums[indices]
-        values = values[indices]
-        #Shape: num_parcels (IN ALL OF BATCH)
-
-        # est values, true values
-        return vals_sums, values
-
-    def shared_step(self, batch):
-        output = self(batch['image']).squeeze(1)
-        output = torch.mul(output,batch['total_parcel_mask'])
-        loss = self.loss(output,batch['uniform_value_map'])
-        return {'loss': loss}
-
-    def training_step(self, batch, batch_idx):
-        output = self.shared_step(batch)
-        self.log('train_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
-        return output['loss']
-
-    def validation_step(self, batch, batch_idx):
-        output = self.shared_step(batch)
-        self.log('val_loss', output['loss'], on_epoch = True, batch_size=cfg.train.batch_size)
-        return output['loss']
-
-    def test_step(self, batch, batch_idx):
-        output = self.shared_step(batch)
-        self.log('test_loss', output['loss'], on_epoch = True)
-        return output['loss']
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return optimizer
-
 class ProbUniformModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
+        if use_pretrained:
+            _load_pretrained(self.unet)
 
         self.softplus = nn.Softplus()
 
@@ -276,17 +215,12 @@ class ProbUniformModule(pl.LightningModule):
         return optimizer
 
 class RSampleModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
+        if use_pretrained:
+            _load_pretrained(self.unet)
 
         self.softplus = nn.Softplus()
 
@@ -404,18 +338,13 @@ class RSampleModule(pl.LightningModule):
         return optimizer
 
 class GaussModule(pl.LightningModule):
-    def __init__(self,use_pretrained):
+    def __init__(self, use_pretrained):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
+        if use_pretrained:
+            _load_pretrained(self.unet)
 
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
-        
         self.softplus = nn.Softplus()
 
     def forward(self, x):
@@ -554,23 +483,17 @@ class GaussModule(pl.LightningModule):
         return optimizer
 
 class LOGRSampleModule(pl.LightningModule):
-    def __init__(self,use_pretrained, num_samples):
+    def __init__(self, use_pretrained, num_samples):
         super().__init__()
         self.unet = unet.UNet(in_channels=3, out_channels=2)
 
-        if(use_pretrained):
-            pretrained_state = torch.load('/u/eag-d1/data/Hennepin/model_checkpoints/building_seg_pretrained.pth')
-
-            model_state = self.unet.state_dict()
-            pretrained_state = { k:v for k,v in pretrained_state.items() if k in model_state and v.size() == model_state[k].size() }
-            model_state.update(pretrained_state)
-            self.unet.load_state_dict(model_state)
+        if use_pretrained:
+            _load_pretrained(self.unet)
 
         self.softplus = nn.Softplus()
 
         self.one_sample_std = torch.nn.Parameter(torch.tensor(5000.0))
         self.one_sample_std.requires_grad = True
-        
 
         self.num_samples = num_samples
 
